@@ -1,0 +1,102 @@
+
+import { getServerSession } from 'next-auth'
+import { redirect } from 'next/navigation'
+import { authOptions } from '@/lib/auth-options'
+import { prisma } from '@/lib/db'
+import { DashboardClient } from '@/components/dashboard-client'
+
+export const dynamic = 'force-dynamic'
+
+async function getDashboardData(userId: string) {
+  try {
+    // Get recent mood records
+    const recentMoods = await prisma.moodRecord.findMany({
+      where: { userId },
+      orderBy: { date: 'desc' },
+      take: 7,
+      include: {
+        activities: {
+          include: {
+            category: true
+          }
+        }
+      }
+    })
+
+    // Get mood stats
+    const totalMoods = await prisma.moodRecord.count({
+      where: { userId }
+    })
+
+    const thisMonth = new Date()
+    thisMonth.setDate(1)
+    thisMonth.setHours(0, 0, 0, 0)
+
+    const monthlyMoods = await prisma.moodRecord.findMany({
+      where: {
+        userId,
+        date: { gte: thisMonth }
+      },
+      select: { numericScale: true }
+    })
+
+    const avgMood = monthlyMoods.length > 0 
+      ? monthlyMoods.reduce((sum, mood) => sum + (mood.numericScale || 0), 0) / monthlyMoods.length
+      : 0
+
+    // Get activity stats
+    const totalActivities = await prisma.activity.count({
+      where: {
+        moodRecord: {
+          userId
+        }
+      }
+    })
+
+    // Get shared access info
+    const sharedAccess = await prisma.sharedAccess.count({
+      where: {
+        ownerId: userId,
+        status: 'ACCEPTED'
+      }
+    })
+
+    return {
+      recentMoods: recentMoods.map(mood => ({
+        ...mood,
+        date: mood.date.toISOString(),
+        createdAt: mood.createdAt.toISOString(),
+        updatedAt: mood.updatedAt.toISOString()
+      })),
+      stats: {
+        totalMoods,
+        avgMood: Math.round(avgMood * 10) / 10,
+        totalActivities,
+        sharedWith: sharedAccess
+      }
+    }
+  } catch (error) {
+    console.error('Dashboard data error:', error)
+    return {
+      recentMoods: [],
+      stats: {
+        totalMoods: 0,
+        avgMood: 0,
+        totalActivities: 0,
+        sharedWith: 0
+      }
+    }
+  }
+}
+
+export default async function DashboardPage() {
+  const session = await getServerSession(authOptions)
+
+  if (!session?.user) {
+    redirect('/auth/entrar')
+  }
+
+  const data = await getDashboardData(session.user.id)
+
+  return <DashboardClient data={data} />
+}

@@ -1,30 +1,37 @@
-
 import { withAuth } from 'next-auth/middleware'
 
 export default withAuth(
   function middleware(req) {
-    // Middleware logic if needed
+    // lógica opcional se quiser inspecionar o req
   },
   {
     callbacks: {
       authorized: ({ token, req }) => {
-        // Allow access to auth pages without token
-        if (req.nextUrl.pathname.startsWith('/auth')) {
+        const { pathname } = req.nextUrl
+
+        // permitir acesso às páginas públicas
+        if (
+          pathname.startsWith('/auth') || // tela de login/signup
+          pathname === '/' ||              // homepage pública
+          pathname.startsWith('/api/auth') // rotas de autenticação do next-auth
+        ) {
           return true
         }
-        // Allow access to homepage without token
-        if (req.nextUrl.pathname === '/') {
-          return true
-        }
-        // Require token for protected routes
+
+        // exigir token para rotas protegidas
         return !!token
       },
     },
   }
 )
 
+// ⚙️ matcher válido no Next 14: sem regex complexa, apenas prefixos
 export const config = {
   matcher: [
-    '/((?!api/auth|api/signup|_next/static|_next/image|favicon.ico|og-image.png|robots.txt|.*\\.svg$).*)',
-  ]
+    '/dashboard/:path*',
+    '/perfil/:path*',
+    '/configuracoes/:path*',
+    '/relatorios/:path*',
+  ],
 }
+

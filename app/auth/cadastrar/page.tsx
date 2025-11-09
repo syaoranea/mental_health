@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { signIn } from 'next-auth/react'
+import { signUp } from '@/lib/cognito'
 
 export default function SignUpPage() {
   const router = useRouter()
@@ -23,14 +24,18 @@ export default function SignUpPage() {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    birthdate: '',
+    gender: '',
+    picture: ''
   })
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
-    try {
+   
       // Validation
       if (!formData.name || !formData.email || !formData.password) {
         toast.error('Todos os campos são obrigatórios')
@@ -52,8 +57,25 @@ export default function SignUpPage() {
         return
       }
 
+      
+      try {
+        await signUp(formData.email, formData.password, {
+          name: formData.name,
+          birthdate: formData.birthdate,
+          gender: formData.gender,
+          picture: formData.picture,
+        })
+
+        toast.success('Cadastro iniciado! Verifique seu email para o código')
+        router.push('/dashboard')
+      } catch (e: any) {
+        toast.error('Erro ao criar conta')
+        alert(e?.message ?? 'Erro no cadastro')
+      }
+      
+
       // Create account
-      const response = await fetch('/api/signup', {
+      /* const response = await fetch('/api/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,7 +94,7 @@ export default function SignUpPage() {
         return
       }
 
-      // Auto sign in after successful signup
+    
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
@@ -88,10 +110,11 @@ export default function SignUpPage() {
       }
     } catch (error) {
       toast.error('Erro ao criar conta. Tente novamente.')
-    } finally {
-      setIsLoading(false)
-    }
+    } finally { }*/
+      
+    setIsLoading(false)
   }
+  
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -163,6 +186,51 @@ export default function SignUpPage() {
                   />
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="birthdate">Data de Nascimento</Label>
+                <Input
+                  id="birthdate"
+                  name="birthdate"
+                  type="date"
+                  value={formData.birthdate}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="gender">Gênero</Label>
+                <select
+                  id="gender"
+                  name="gender"
+                  value={formData.gender}
+                  onChange={(e) => handleChange(e as any)}
+                  className="w-full border rounded-md p-2 text-sm"
+                  disabled={isLoading}
+                  required
+                >
+                  <option value="">Selecione</option>
+                  <option value="male">Masculino</option>
+                  <option value="female">Feminino</option>
+                  <option value="other">Outro</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="picture">Foto de Perfil (URL)</Label>
+                <Input
+                  id="picture"
+                  name="picture"
+                  type="url"
+                  value={formData.picture}
+                  onChange={handleChange}
+                  placeholder="https://exemplo.com/foto.jpg"
+                  disabled={isLoading}
+                />
+              </div>
+
 
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>

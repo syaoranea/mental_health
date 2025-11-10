@@ -11,7 +11,6 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
-import { signIn } from 'next-auth/react'
 import { signUp } from '@/lib/cognito'
 
 export default function SignUpPage() {
@@ -27,7 +26,6 @@ export default function SignUpPage() {
     confirmPassword: '',
     birthdate: '',
     gender: '',
-    picture: ''
   })
 
 
@@ -63,15 +61,16 @@ export default function SignUpPage() {
           name: formData.name,
           birthdate: formData.birthdate,
           gender: formData.gender,
-          picture: formData.picture,
-        })
+          picture: 'https://meurefugio.app/default-avatar.png',
+        });
 
-        toast.success('Cadastro iniciado! Verifique seu email para o código')
-        router.push('/dashboard')
+        toast.success('Cadastro iniciado! Verifique seu e-mail para confirmar o código');
+        router.push('/auth/confirmar');
       } catch (e: any) {
-        toast.error('Erro ao criar conta')
-        alert(e?.message ?? 'Erro no cadastro')
+        toast.error('Erro ao criar conta');
+        alert(e?.message ?? 'Erro no cadastro');
       }
+
       
 
       // Create account
@@ -217,20 +216,6 @@ export default function SignUpPage() {
                   <option value="other">Outro</option>
                 </select>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="picture">Foto de Perfil (URL)</Label>
-                <Input
-                  id="picture"
-                  name="picture"
-                  type="url"
-                  value={formData.picture}
-                  onChange={handleChange}
-                  placeholder="https://exemplo.com/foto.jpg"
-                  disabled={isLoading}
-                />
-              </div>
-
 
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>

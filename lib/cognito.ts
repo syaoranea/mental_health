@@ -1,67 +1,70 @@
 import {
-  AuthenticationDetails,
-  CognitoUser,
-  CognitoUserAttribute,
   CognitoUserPool,
-} from 'amazon-cognito-identity-js'
+  CognitoUserAttribute,
+  CognitoUser,
+  AuthenticationDetails
+} from 'amazon-cognito-identity-js';
 
 const poolData = {
-  UserPoolId: 'us-east-1_MTpOnlI5f',
-  ClientId: '2u6dkn6qb6cb35mmvk9nvf67au',
-}
+  UserPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID!, // ex: 'us-east-1_xxxxx'
+  ClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID! // ex: 'xxxxxxxxxxxxxxxxxxxxxx'
+};
 
-export const userPool = new CognitoUserPool(poolData)
+export const userPool = new CognitoUserPool(poolData);
 
-export async function signUp(email: string, password: string, extraAttrs: any) {
-  const attributeList = [
-    new CognitoUserAttribute({ Name: 'email', Value: email }),
-    new CognitoUserAttribute({ Name: 'name', Value: extraAttrs.name }),
-    new CognitoUserAttribute({ Name: 'birthdate', Value: extraAttrs.birthdate }),
-    new CognitoUserAttribute({ Name: 'gender', Value: extraAttrs.gender }),
-    new CognitoUserAttribute({ Name: 'picture', Value: extraAttrs.picture }),
-  ]
-
+export const signUp = (
+  email: string,
+  password: string,
+  attributes: { [key: string]: string }
+): Promise<any> => {
   return new Promise((resolve, reject) => {
+    const attributeList = Object.entries(attributes).map(
+      ([Name, Value]) => new CognitoUserAttribute({ Name, Value })
+    );
+
     userPool.signUp(email, password, attributeList, [], (err, result) => {
-      if (err) reject(err)
-      else resolve(result)
-    })
-  })
-}
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(result);
+    });
+  });
+};
 
-export function confirmSignUp(email: string, code: string) {
-  const user = new CognitoUser({ Username: email, Pool: userPool })
+export const confirmUser = (email: string, code: string): Promise<any> => {
   return new Promise((resolve, reject) => {
-    user.confirmRegistration(code, true, (err, result) => {
-      if (err) return reject(err)
-      resolve(result)
+    const userData = { Username: email, Pool: userPool }
+    const cognitoUser = new CognitoUser(userData)
+
+    cognitoUser.confirmRegistration(code, true, (err, result) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve(result)
+      }
     })
   })
 }
 
-export function signIn(email: string, password: string) {
-  const authDetails = new AuthenticationDetails({ Username: email, Password: password })
-  const user = new CognitoUser({ Username: email, Pool: userPool })
-  return new Promise<{ user: CognitoUser; session: any }>((resolve, reject) => {
+export async function loginCognito(email: string, password: string) {
+  return new Promise((resolve, reject) => {
+    const user = new CognitoUser({ Username: email, Pool: userPool })
+    const authDetails = new AuthenticationDetails({
+      Username: email,
+      Password: password,
+    })
+
     user.authenticateUser(authDetails, {
-      onSuccess: (session) => resolve({ user, session }),
-      onFailure: (err) => reject(err),
-      newPasswordRequired: (userAttributes) => {
-        // caso política force troca de senha no primeiro login
-        reject({ code: 'NEW_PASSWORD_REQUIRED', details: userAttributes })
+      onSuccess: (result) => {
+        resolve({
+          email,
+          token: result.getIdToken().getJwtToken(),
+        })
+      },
+      onFailure: (err) => {
+        reject(err)
       },
     })
   })
 }
-
-export function refreshSession(email: string, refreshTokenStr: string) {
-  const user = new CognitoUser({ Username: email, Pool: userPool })
-  const refreshToken = new (require('amazon-cognito-identity-js').CognitoRefreshToken)({ RefreshToken: refreshTokenStr })
-  return new Promise<any>((resolve, reject) => {
-    user.refreshSession(refreshToken, (err: any, session: any) => {
-      if (err) return reject(err)
-      resolve(session)
-    })
-  })
-}
-

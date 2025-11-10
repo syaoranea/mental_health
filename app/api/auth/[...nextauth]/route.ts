@@ -1,10 +1,30 @@
-import NextAuth from "next-auth"
-import CognitoProvider from "next-auth/providers/cognito"
-import { authOptions } from "@/lib/auth-options"
+import {
+  AuthenticationDetails,
+  CognitoUser,
+} from 'amazon-cognito-identity-js'
+import { userPool } from '@/lib/cognito'
 
-// Criamos o handler com as opções centralizadas em /lib/auth-options.ts
-const handler = NextAuth(authOptions)
+export async function loginCognito(email: string, password: string) {
+  return new Promise((resolve, reject) => {
+    const user = new CognitoUser({ Username: email, Pool: userPool })
+    const authDetails = new AuthenticationDetails({
+      Username: email,
+      Password: password,
+    })
 
-// Exporta o mesmo handler para GET e POST
-export { handler as GET, handler as POST }
+    user.authenticateUser(authDetails, {
+      onSuccess: (result) => {
+        resolve({
+          email,
+          token: result.getIdToken().getJwtToken(),
+        })
+      },
+      onFailure: (err) => {
+        reject(err)
+      },
+    })
+  })
+}
+
+
 

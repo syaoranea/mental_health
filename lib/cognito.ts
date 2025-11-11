@@ -2,8 +2,27 @@ import {
   CognitoUserPool,
   CognitoUserAttribute,
   CognitoUser,
-  AuthenticationDetails
+  AuthenticationDetails,
+  CognitoUserSession
 } from 'amazon-cognito-identity-js';
+
+export async function signIn(
+  email: string,
+  password: string
+): Promise<{ session: CognitoUserSession }> {
+  return new Promise((resolve, reject) => {
+    const user = new CognitoUser({ Username: email, Pool: userPool })
+    const authDetails = new AuthenticationDetails({
+      Username: email,
+      Password: password,
+    })
+
+    user.authenticateUser(authDetails, {
+      onSuccess: (session) => resolve({ session }),
+      onFailure: (err) => reject(err),
+    })
+  })
+}
 
 const poolData = {
   UserPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID!, // ex: 'us-east-1_xxxxx'
@@ -68,3 +87,5 @@ export async function loginCognito(email: string, password: string) {
     })
   })
 }
+
+

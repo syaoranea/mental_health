@@ -1,11 +1,11 @@
-/* 
+
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { validateEmail } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest) {
+/* export async function POST(request: NextRequest) {
   try {
     const { email, password, name } = await request.json()
 

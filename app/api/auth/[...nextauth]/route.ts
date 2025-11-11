@@ -1,30 +1,17 @@
-import {
-  AuthenticationDetails,
-  CognitoUser,
-} from 'amazon-cognito-identity-js'
-import { userPool } from '@/lib/cognito'
+import NextAuth from 'next-auth'
+import CognitoProvider from 'next-auth/providers/cognito'
 
-export async function loginCognito(email: string, password: string) {
-  return new Promise((resolve, reject) => {
-    const user = new CognitoUser({ Username: email, Pool: userPool })
-    const authDetails = new AuthenticationDetails({
-      Username: email,
-      Password: password,
-    })
+const handler = NextAuth({
+  providers: [
+    CognitoProvider({
+      clientId: process.env.COGNITO_CLIENT_ID!,
+      clientSecret: process.env.COGNITO_CLIENT_SECRET!,
+      issuer: process.env.COGNITO_ISSUER!,
+    }),
+  ],
+})
 
-    user.authenticateUser(authDetails, {
-      onSuccess: (result) => {
-        resolve({
-          email,
-          token: result.getIdToken().getJwtToken(),
-        })
-      },
-      onFailure: (err) => {
-        reject(err)
-      },
-    })
-  })
-}
+export { handler as GET, handler as POST }
 
 
 

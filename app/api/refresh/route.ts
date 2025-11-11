@@ -1,6 +1,5 @@
 // src/app/api/auth/refresh/route.ts
 import { NextResponse } from 'next/server'
-import { refreshSession } from '@/lib/cognito'
 
 const cookieBase = {
   httpOnly: true,
@@ -9,7 +8,7 @@ const cookieBase = {
   path: '/',
 }
 
-export async function POST() {
+/* export async function POST() {
   try {
     // pegamos email e refresh dos cookies
     const headers = new Headers()
@@ -43,4 +42,4 @@ export async function POST() {
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? 'Refresh failed' }, { status: 401 })
   }
-}
+} */

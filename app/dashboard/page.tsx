@@ -2,12 +2,11 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth-options'
-import { prisma } from '@/lib/db'
 import { DashboardClient } from '@/components/dashboard-client'
 
 export const dynamic = 'force-dynamic'
 
-async function getDashboardData(userId: string) {
+/* async function getDashboardData(userId: string) {
   try {
     // Get recent mood records
     const recentMoods = await prisma.moodRecord.findMany({
@@ -87,7 +86,7 @@ async function getDashboardData(userId: string) {
       }
     }
   }
-}
+} */
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
@@ -96,7 +95,25 @@ export default async function DashboardPage() {
     redirect('/auth/entrar')
   }
 
-  const data = await getDashboardData(session.user.id)
+ // const data = await getDashboardData(session.user.id)
 
+ interface DashboardData {
+  recentMoods: any[]
+  stats: {
+    totalMoods: number
+    avgMood: number
+    totalActivities: number
+    sharedWith: number
+  }
+}
+const data = {
+  recentMoods: [],
+  stats: {
+    totalMoods: 1,
+    avgMood: 2,
+    totalActivities: 3,
+    sharedWith: 1
+  }
+}
   return <DashboardClient data={data} />
 }

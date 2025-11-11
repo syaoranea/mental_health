@@ -22,24 +22,24 @@ export default function SignInPage() {
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    const password = formData.password
-    const email = formData.email
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    })
-    if (res.ok) {
-      toast.success('Bem-vindo de volta!') 
-      router.push('/dashboard') 
-    }
-    else toast.error('Email ou senha incorretos')
-    
-    setIsLoading(false)
-    
+  e.preventDefault()
+  setIsLoading(true)
+
+  const result = await signIn('credentials', {
+    email: formData.email,
+    password: formData.password,
+    redirect: false,
+  })
+
+  setIsLoading(false)
+
+  if (result?.error) {
+    toast.error('Email ou senha incorretos')
+  } else {
+    toast.success('Bem-vindo de volta!')
+    router.push('/dashboard')
   }
+}
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -127,12 +127,12 @@ export default function SignInPage() {
             </form>
 
             <Button
-  onClick={() => signIn('cognito')}
-  className="w-full flex items-center justify-center gap-2 bg-white border hover:bg-gray-100 text-gray-800"
->
-  <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
-  Entrar com Google
-</Button>
+              onClick={() => signIn('cognito')}
+              className="w-full flex items-center justify-center gap-2 bg-white border hover:bg-gray-100 text-gray-800"
+            >
+              <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
+              Entrar com Google
+            </Button>
 
 
             <div className="mt-6 text-center text-sm">

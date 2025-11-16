@@ -26,10 +26,10 @@ export default function SignInPage() {
   setIsLoading(true)
 
   const result = await signIn('credentials', {
-    email: formData.email,
-    password: formData.password,
-    redirect: false,
-  })
+  email: formData.email,
+  password: formData.password,
+  redirect: false,
+})
 
   setIsLoading(false)
 
@@ -126,11 +126,7 @@ export default function SignInPage() {
               </Button>
             </form>
 
-            <Button
-              onClick={() => signIn('cognito')}
-              className="w-full flex items-center justify-center gap-2 bg-white border hover:bg-gray-100 text-gray-800"
-            >
-              <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
+            <Button onClick={() => signIn('cognito')}>
               Entrar com Google
             </Button>
 

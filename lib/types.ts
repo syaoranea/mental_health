@@ -84,3 +84,23 @@ export interface ChartDataPoint {
   mood: number
   activities?: number
 }
+
+
+declare module "next-auth" {
+  interface User {
+    accessToken?: string
+    idToken?: string
+    refreshToken?: string
+  }
+
+  interface Session {
+    accessToken?: string
+    idToken?: string
+  }
+
+  interface JWT {
+    accessToken?: string
+    idToken?: string
+    refreshToken?: string
+  }
+}

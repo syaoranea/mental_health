@@ -9,9 +9,9 @@ jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     env:
-      COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
-      COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
-      COGNITO_REGION: ${{ secrets.COGNITO_REGION }}
+      NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
+      NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
+      NEXT_PUBLIC_COGNITO_REGION: ${{ secrets.COGNITO_REGION }}
 
     steps:
       - name: Checkout do código

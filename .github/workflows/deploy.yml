@@ -8,31 +8,29 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-    env:
-      NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
-      NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
-      NEXT_PUBLIC_COGNITO_REGION: ${{ secrets.COGNITO_REGION }}
 
     steps:
-      - name: Checkout do código
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
 
       - name: Instalar dependências
         run: npm ci --legacy-peer-deps
 
-
       - name: Build do Next.js
+        env:
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
+          NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
+          NEXT_PUBLIC_COGNITO_REGION: ${{ secrets.COGNITO_REGION }}
         run: npm run build
 
       - name: Exportar arquivos estáticos
         run: npm run export
 
-      # CONFIGURA CREDENCIAIS AWS
       - name: Configurar credenciais AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -40,8 +38,5 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: sa-east-1
 
-      # FAZ O DEPLOY PARA O S3
-      - name: Fazer deploy para o S3
-        run: |
-          aws s3 sync ./out s3://meu-refugio --delete
-
+      - name: Deploy para S3
+        run: aws s3 sync ./out s3://meu-refugio --delete

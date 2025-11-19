@@ -1,4 +1,3 @@
-
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
@@ -7,6 +6,7 @@ import { Providers } from '@/components/providers'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://meurefugio.app"),
   title: 'MeuRefúgio - Monitoramento de Saúde Mental',
   description: 'Sua jornada de bem-estar mental em um só lugar. Registre, acompanhe e compartilhe seu progresso de forma segura e privada.',
   keywords: ['saúde mental', 'bem-estar', 'humor', 'monitoramento', 'apoio'],
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'MeuRefúgio - Monitoramento de Saúde Mental',
     description: 'Sua jornada de bem-estar mental em um só lugar',
-    url: 'https://meurefugio.app',
+    url: 'https://main.d3l909fwjeu3ws.amplifyapp.com/',
     siteName: 'MeuRefúgio',
     images: [
       {

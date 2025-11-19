@@ -24,7 +24,7 @@ export default function SignInPage() {
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault()
   setIsLoading(true)
-
+/* 
   const result = await signIn('credentials', {
   email: formData.email,
   password: formData.password,
@@ -38,7 +38,7 @@ export default function SignInPage() {
   } else {
     toast.success('Bem-vindo de volta!')
     router.push('/dashboard')
-  }
+  } */
 }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

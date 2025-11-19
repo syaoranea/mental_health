@@ -22,7 +22,7 @@ export default function ConfirmPage() {
     e.preventDefault()
     setLoading(true)
 
-    const user = new CognitoUser({ Username: email, Pool: userPool })
+   /*  const user = new CognitoUser({ Username: email, Pool: userPool })
 
     user.confirmRegistration(code, true, (err, result) => {
       setLoading(false)
@@ -33,7 +33,7 @@ export default function ConfirmPage() {
 
       toast.success('Conta confirmada com sucesso! 🎉')
       router.push('/auth/entrar')
-    })
+    }) */
   }
 
   return (

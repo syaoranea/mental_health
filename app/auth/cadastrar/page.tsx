@@ -10,11 +10,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { toast } from 'sonner'
-import { signUp } from '@/lib/cognito'
+
 
 export default function SignUpPage() {
-  const router = useRouter()
+
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -33,7 +32,7 @@ export default function SignUpPage() {
     e.preventDefault()
     setIsLoading(true)
 
-   
+   /* 
       // Validation
       if (!formData.name || !formData.email || !formData.password) {
         toast.error('Todos os campos são obrigatórios')
@@ -69,7 +68,7 @@ export default function SignUpPage() {
       } catch (e: any) {
         toast.error('Erro ao criar conta');
         alert(e?.message ?? 'Erro no cadastro');
-      }
+      } */
 
       
 

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Loader2, CheckCircle2, Mail, KeyRound } from 'lucide-react'
-import { confirmUser } from '@/lib/cognito'
+
 
 export default function ConfirmSignUpPage() {
   const router = useRouter()
@@ -29,7 +29,7 @@ export default function ConfirmSignUpPage() {
     e.preventDefault()
     setIsLoading(true)
 
-    try {
+   /*  try {
       await confirmUser(formData.email, formData.code)
       toast.success('Conta confirmada com sucesso! 🎉')
       router.push('/auth/entrar')
@@ -38,7 +38,7 @@ export default function ConfirmSignUpPage() {
       toast.error(err?.message || 'Erro ao confirmar conta')
     } finally {
       setIsLoading(false)
-    }
+    } */
   }
 
   return (

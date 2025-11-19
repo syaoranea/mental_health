@@ -5,7 +5,7 @@ import type { OAuthConfig } from "next-auth/providers/oauth"
 
 // 🔐 AWS Cognito Client
 const client = new CognitoIdentityProviderClient({
-  region: process.env.COGNITO_REGION,
+  region:' process.env.COGNITO_REGION',
 })
 
 // 🔐 Provider Cognito OAuth (corrigido com profile)
@@ -57,7 +57,7 @@ const handler = NextAuth({
   try {
     const command = new InitiateAuthCommand({
       AuthFlow: "USER_PASSWORD_AUTH",
-      ClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID!,
+      ClientId: 'process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID!',
       AuthParameters: {
         USERNAME: credentials.email,
         PASSWORD: credentials.password,
@@ -91,11 +91,11 @@ const handler = NextAuth({
     }),
 
     // 🔹 OAuth Cognito (Google, Apple, etc via Hosted UI)
-    CognitoProvider({
+/*     CognitoProvider({
       clientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID!,
       clientSecret: process.env.COGNITO_CLIENT_SECRET!,
-      domain: process.env.COGNITO_DOMAIN!, // ex: myapp.auth.us-east-1.amazoncognito.com
-    })
+      domain: process.env.COGNITO_DOMAIN!, 
+    }) */
   ],
 
   callbacks: {

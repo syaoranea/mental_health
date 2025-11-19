@@ -11,8 +11,8 @@ import {
  * Isso impede erro durante o build do Next.js no GitHub Actions.
  */
 function getUserPool() {
-  const UserPoolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
-  const ClientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID;
+  const UserPoolId = 'process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID';
+  const ClientId = 'process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID';
 
   // Evita crash no build
   if (!UserPoolId || !ClientId) {

@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Heart, Plus, TrendingUp, Activity, Users, Calendar, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,6 +17,9 @@ import { RecentMoods } from '@/components/recent-moods'
 import { QuickActions } from '@/components/quick-actions'
 import { formatDate, getMoodColorClass } from '@/lib/utils'
 import Link from 'next/link'
+import { getCurrentUser } from 'aws-amplify/auth'
+import { useRouter } from 'next/navigation'
+
 
 interface DashboardData {
   recentMoods: any[]
@@ -35,6 +38,24 @@ interface DashboardClientProps {
 export function DashboardClient({ data }: DashboardClientProps) {
   const { recentMoods, stats } = data
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('7d')
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const current = await getCurrentUser();
+        setUser(current);
+      } catch {
+        router.push("/auth/entrar");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  }, []);
 
   const todayMood = recentMoods.find(mood => {
     const moodDate = new Date(mood.date).toDateString()
@@ -44,6 +65,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
 
   const hasRecordedToday = !!todayMood
 
+   if (loading) return <div>Carregando...</div>;
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       <Header />

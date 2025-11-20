@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { signUp } from 'aws-amplify/auth';
+import { toast } from 'sonner'
 
 
 export default function SignUpPage() {
@@ -28,91 +30,59 @@ export default function SignUpPage() {
   })
 
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+const router = useRouter();
 
-   /* 
-      // Validation
-      if (!formData.name || !formData.email || !formData.password) {
-        toast.error('Todos os campos são obrigatórios')
-        return
-      }
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
 
-      if (formData.password !== formData.confirmPassword) {
-        toast.error('As senhas não coincidem')
-        return
-      }
+  if (!formData.name || !formData.email || !formData.password) {
+    toast.error("Preencha todos os campos");
+    setIsLoading(false);
+    return;
+  }
 
-      if (formData.password.length < 8) {
-        toast.error('A senha deve ter pelo menos 8 caracteres')
-        return
-      }
+  if (formData.password !== formData.confirmPassword) {
+    toast.error("As senhas não coincidem");
+    setIsLoading(false);
+    return;
+  }
 
-      if (!agreeTerms) {
-        toast.error('Você deve aceitar os termos de uso')
-        return
-      }
+  if (!agreeTerms) {
+    toast.error("Você deve aceitar os termos de uso");
+    setIsLoading(false);
+    return;
+  }
 
-      
-      try {
-        await signUp(formData.email, formData.password, {
+  try {
+    const result = await signUp({
+      username: formData.email,
+      password: formData.password,
+      options: {
+        userAttributes: {
+          email: formData.email,
           name: formData.name,
           birthdate: formData.birthdate,
           gender: formData.gender,
-          picture: 'https://meurefugio.app/default-avatar.png',
-        });
-
-        toast.success('Cadastro iniciado! Verifique seu e-mail para confirmar o código');
-        router.push('/auth/confirmar');
-      } catch (e: any) {
-        toast.error('Erro ao criar conta');
-        alert(e?.message ?? 'Erro no cadastro');
-      } */
-
-      
-
-      // Create account
-      /* const response = await fetch('/api/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password
-        }),
-      })
+      },
+    });
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        toast.error(data.error || 'Erro ao criar conta')
-        return
-      }
+    console.log("SIGNUP RESULT:", result);
 
     
-      const result = await signIn('credentials', {
-        email: formData.email,
-        password: formData.password,
-        redirect: false
-      })
+    toast.success('Conta criada! Verifique seu email para confirmar o código');
 
-      if (result?.ok) {
-        toast.success('Conta criada com sucesso! Bem-vindo!')
-        router.push('/dashboard')
-      } else {
-        toast.success('Conta criada com sucesso! Faça login para continuar.')
-        router.push('/auth/entrar')
-      }
-    } catch (error) {
-      toast.error('Erro ao criar conta. Tente novamente.')
-    } finally { }*/
-      
-    setIsLoading(false)
+    // Redireciona para página de confirmação
+    router.push(`/auth/confirmar?email=${formData.email}`);
+
+  } catch (error: any) {
+    console.error(error);
+    toast.error(error?.message || "Erro ao criar conta");
+  } finally {
+    setIsLoading(false);
   }
-  
+};
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({

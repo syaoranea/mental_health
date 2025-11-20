@@ -1,52 +1,86 @@
+"use client";
 
-'use client'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-import { useState } from 'react'
-import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Eye, EyeOff, Heart, Mail, Lock, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { toast } from 'sonner'
+import { Eye, EyeOff, Heart, Mail, Lock, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+import { toast } from "sonner";
+import { signIn, signOut, signInWithRedirect } from "aws-amplify/auth";
 
 export default function SignInPage() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  })
+    email: "",
+    password: "",
+  });
 
+  // AÇÃO DE LOGIN NORMAL
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-  setIsLoading(true)
-/* 
-  const result = await signIn('credentials', {
-  email: formData.email,
-  password: formData.password,
-  redirect: false,
-})
+    e.preventDefault();
+    setIsLoading(true);
 
-  setIsLoading(false)
+    try {
+      // Se existir sessão anterior, ignora erro
+      try {
+        await signOut();
+      } catch (_) {}
 
-  if (result?.error) {
-    toast.error('Email ou senha incorretos')
-  } else {
-    toast.success('Bem-vindo de volta!')
-    router.push('/dashboard')
-  } */
-}
+      const { isSignedIn, nextStep } = await signIn({
+        username: formData.email,
+        password: formData.password,
+      });
 
+      // Caso usuário não tenha confirmado email
+      if (nextStep?.signInStep === "CONFIRM_SIGN_UP") {
+        toast.info("Confirme seu email para continuar.");
+        router.push(`/auth/confirmar?email=${formData.email}`);
+        return;
+      }
+
+      if (isSignedIn) {
+        toast.success("Bem-vindo de volta!");
+        router.push("/dashboard");
+        return;
+      }
+
+      console.log("nextStep:", nextStep);
+    } catch (error: any) {
+      console.error(error);
+
+      if (error.name === "UserNotConfirmedException") {
+        toast.info("Confirme seu email antes de entrar.");
+        router.push(`/auth/confirmar?email=${formData.email}`);
+        return;
+      }
+
+      toast.error(error.message || "Erro ao entrar");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // CONTROLAR CAMPOS
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
-    }))
-  }
+      [e.target.name]: e.target.value,
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/20 flex items-center justify-center p-4">
@@ -55,12 +89,11 @@ export default function SignInPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
             <Heart className="w-8 h-8 text-primary" />
           </div>
+
           <h1 className="text-2xl font-bold text-gray-900">
             Bem-vindo de volta
           </h1>
-          <p className="text-gray-600 mt-2">
-            Continue sua jornada de bem-estar
-          </p>
+          <p className="text-gray-600 mt-2">Continue sua jornada de bem-estar</p>
         </div>
 
         <Card className="shadow-lg">
@@ -97,7 +130,7 @@ export default function SignInPage() {
                   <Input
                     id="password"
                     name="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="Sua senha"
@@ -111,25 +144,28 @@ export default function SignInPage() {
                     className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                     disabled={isLoading}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isLoading ? 'Entrando...' : 'Entrar'}
+                {isLoading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
 
-            <Button onClick={() => signIn('cognito')}>
+            <Button
+              className="w-full mt-4"
+              onClick={() => signInWithRedirect({ provider: "Google" })}
+              disabled={isLoading}
+            >
               Entrar com Google
             </Button>
-
 
             <div className="mt-6 text-center text-sm">
               <span className="text-gray-600">Ainda não tem uma conta? </span>
@@ -150,5 +186,5 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

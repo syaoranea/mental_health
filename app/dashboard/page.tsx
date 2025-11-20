@@ -1,7 +1,5 @@
 
-import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/lib/auth-options'
 import { DashboardClient } from '@/components/dashboard-client'
 
 export const dynamic = 'force-dynamic'
@@ -89,11 +87,17 @@ export const dynamic = 'force-dynamic'
 } */
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions)
 
-  if (!session?.user) {
-    redirect('/auth/entrar')
-  }
+
+  const data = {
+    recentMoods: [],
+    stats: {
+      totalMoods: 1,
+      avgMood: 2,
+      totalActivities: 3,
+      sharedWith: 1
+    }
+  };
 
  // const data = await getDashboardData(session.user.id)
 
@@ -106,14 +110,6 @@ export default async function DashboardPage() {
     sharedWith: number
   }
 }
-const data = {
-  recentMoods: [],
-  stats: {
-    totalMoods: 1,
-    avgMood: 2,
-    totalActivities: 3,
-    sharedWith: 1
-  }
-}
+
   return <DashboardClient data={data} />
 }

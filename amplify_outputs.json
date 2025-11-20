@@ -1,0 +1,33 @@
+{
+  "auth": {
+    "user_pool_id": "us-east-1_0xqij1Fxo",
+    "aws_region": "us-east-1",
+    "user_pool_client_id": "7ku2vj4bd5q6c50as3chg0vsv9",
+    "identity_pool_id": "us-east-1:e3719006-b680-4968-8740-b8949cffdc18",
+    "mfa_methods": [],
+    "standard_required_attributes": ["email"],
+    "username_attributes": ["email"],
+    "user_verification_types": ["email"],
+    "groups": [],
+    "mfa_configuration": "NONE",
+    "password_policy": {
+      "min_length": 8,
+      "require_lowercase": true,
+      "require_numbers": true,
+      "require_symbols": true,
+      "require_uppercase": true
+    },
+    "unauthenticated_identities_enabled": true,
+
+    "oauth": {
+      "domain": "https://mentalhealthappa9b4ed43-a9b4ed43-dev.auth.us-east-2.amazoncognito.com",
+      "redirectSignIn": ["http://localhost:3001/dashboard"],
+      "redirectSignOut": ["http://localhost:3001/"],
+      "responseType": "code",
+      "scopes": ["openid", "email", "profile"],
+      "providers": ["Google"]
+    }
+  },
+
+  "version": "1.4"
+}

@@ -17,7 +17,6 @@ import { RecentMoods } from '@/components/recent-moods'
 import { QuickActions } from '@/components/quick-actions'
 import { formatDate, getMoodColorClass } from '@/lib/utils'
 import Link from 'next/link'
-import { getCurrentUser } from 'aws-amplify/auth'
 import { useRouter } from 'next/navigation'
 
 
@@ -35,18 +34,23 @@ interface DashboardClientProps {
   data: DashboardData
 }
 
-export function DashboardClient({ data }: DashboardClientProps) {
+export default function DashboardClient({ data }: DashboardClientProps) {
   const { recentMoods, stats } = data
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('7d')
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
-
+  
+ 
   useEffect(() => {
     async function load() {
       try {
-        const current = await getCurrentUser();
-        setUser(current);
+        const res = await fetch("/api/user", {
+          credentials: "include"
+        });
+
+        const data = await res.json();
+        setUser(data);
       } catch {
         router.push("/auth/entrar");
       } finally {

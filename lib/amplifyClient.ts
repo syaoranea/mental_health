@@ -1,14 +1,9 @@
-"use client";
-
 import { Amplify } from "aws-amplify";
-import outputs from "../amplify_outputs.json";
-
-let configured = false;
+import outputs from "@/amplify_outputs.json";
 
 export function configureAmplify() {
-  if (configured) return;
   Amplify.configure(outputs);
-  configured = true;
 }
+
 
 

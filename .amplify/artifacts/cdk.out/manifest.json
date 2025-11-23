@@ -22,7 +22,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-${AWS::Region}",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/5793c6463930327f934d452d84ca4b4dc52dace2e3f041767291063bc2f58ce4.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/624fbdf49fa1b50a92211dc5c3d2efdf71470adc5ec18862a4798435380c54e7.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -65,10 +65,64 @@
             "data": "region"
           }
         ],
+        "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/AmplifySecretFetcherResourceProviderLambda/ServiceRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AmplifySecretFetcherResourceProviderLambdaServiceRole3F02FB0D"
+          }
+        ],
+        "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/AmplifySecretFetcherResourceProviderLambda/ServiceRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AmplifySecretFetcherResourceProviderLambdaServiceRoleDefaultPolicy080657DD"
+          }
+        ],
+        "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/AmplifySecretFetcherResourceProviderLambda/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AmplifySecretFetcherResourceProviderLambda27823B35"
+          }
+        ],
+        "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/AmplifySecretFetcherResourceProvider/framework-onEvent/ServiceRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AmplifySecretFetcherResourceProviderframeworkonEventServiceRole0941C6B4"
+          }
+        ],
+        "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/AmplifySecretFetcherResourceProvider/framework-onEvent/ServiceRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AmplifySecretFetcherResourceProviderframeworkonEventServiceRoleDefaultPolicy749EBE05"
+          }
+        ],
+        "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/AmplifySecretFetcherResourceProvider/framework-onEvent/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AmplifySecretFetcherResourceProviderframeworkonEventA62AE3A8"
+          }
+        ],
+        "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/AmplifySecretFetcherResource/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AmplifySecretFetcherResource"
+          }
+        ],
         "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/amplifyAuth/UserPool/Resource": [
           {
             "type": "aws:cdk:logicalId",
             "data": "amplifyAuthUserPool4BA7F805"
+          }
+        ],
+        "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/amplifyAuth/UserPool/UserPoolDomain/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "amplifyAuthUserPoolUserPoolDomain1F688B5B"
+          }
+        ],
+        "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/amplifyAuth/GoogleIdP/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "amplifyAuthGoogleIdPA9736819"
           }
         ],
         "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/amplifyAuth/UserPoolAppClient/Resource": [
@@ -129,6 +183,12 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "amplifyappEduardosandbox1a8a43addaauthamplifyAuthIdentityPoolADBC71ADRef"
+          }
+        ],
+        "/amplify-app-Eduardo-sandbox-1a8a43adda/auth/amplifyappEduardosandbox1a8a43addaauthamplifyAuthUserPoolUserPoolDomain5BA53085Ref": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "amplifyappEduardosandbox1a8a43addaauthamplifyAuthUserPoolUserPoolDomain5BA53085Ref"
           }
         ],
         "/amplify-app-Eduardo-sandbox-1a8a43adda/auth.NestedStack/auth.NestedStackResource": [

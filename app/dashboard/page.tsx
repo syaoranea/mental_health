@@ -1,6 +1,5 @@
+import DashboardClient from "@/components/dashboard-client";
 
-import { redirect } from 'next/navigation'
-import { DashboardClient } from '@/components/dashboard-client'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,6 +1,5 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/lib/auth-options'
 import { ddb } from '@/lib/dynamodb'
 import { ScanCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { MoodRegistrationClient } from '@/components/mood-registration-client'
@@ -72,7 +71,7 @@ async function getRegistrationData(userId: string) {
 
 // ✅ O componente principal precisa ser exportado como default
 export default async function RegistrarPage() {
-  const session = await getServerSession(authOptions)
+  const session = await getServerSession()
 
   if (!session?.user) {
     redirect('/auth/entrar')

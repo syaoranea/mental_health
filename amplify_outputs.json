@@ -1,13 +1,19 @@
 {
   "auth": {
-    "user_pool_id": "us-east-1_0xqij1Fxo",
+    "user_pool_id": "us-east-1_Pjcn4tP5l",
     "aws_region": "us-east-1",
-    "user_pool_client_id": "7ku2vj4bd5q6c50as3chg0vsv9",
-    "identity_pool_id": "us-east-1:e3719006-b680-4968-8740-b8949cffdc18",
+    "user_pool_client_id": "6jdlpqut5ug9p3keudpb5vvs90",
+    "identity_pool_id": "us-east-1:557f63bd-817d-411f-ba1a-8d8510211782",
     "mfa_methods": [],
-    "standard_required_attributes": ["email"],
-    "username_attributes": ["email"],
-    "user_verification_types": ["email"],
+    "standard_required_attributes": [
+      "email"
+    ],
+    "username_attributes": [
+      "email"
+    ],
+    "user_verification_types": [
+      "email"
+    ],
     "groups": [],
     "mfa_configuration": "NONE",
     "password_policy": {
@@ -17,17 +23,27 @@
       "require_symbols": true,
       "require_uppercase": true
     },
-    "unauthenticated_identities_enabled": true,
-
     "oauth": {
-      "domain": "https://mentalhealthappa9b4ed43-a9b4ed43-dev.auth.us-east-2.amazoncognito.com",
-      "redirectSignIn": ["http://localhost:3001/dashboard"],
-      "redirectSignOut": ["http://localhost:3001/"],
-      "responseType": "code",
-      "scopes": ["openid", "email", "profile"],
-      "providers": ["Google"]
-    }
+      "identity_providers": [
+        "GOOGLE"
+      ],
+      "redirect_sign_in_uri": [
+        "http://localhost:3001/dashboard"
+      ],
+      "redirect_sign_out_uri": [
+        "http://localhost:3001/"
+      ],
+      "response_type": "code",
+      "scopes": [
+        "phone",
+        "email",
+        "openid",
+        "profile",
+        "aws.cognito.signin.user.admin"
+      ],
+      "domain": "a4c664d78d5266b11b43.auth.us-east-1.amazoncognito.com"
+    },
+    "unauthenticated_identities_enabled": true
   },
-
   "version": "1.4"
 }

@@ -97,19 +97,36 @@
    "Value": "[]"
   },
   "socialProviders": {
-   "Value": ""
+   "Value": "[\"GOOGLE\"]"
   },
   "oauthCognitoDomain": {
-   "Value": ""
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      {
+       "Fn::GetAtt": [
+        "auth179371D7",
+        "Outputs.amplifyappEduardosandbox1a8a43addaauthamplifyAuthUserPoolUserPoolDomain5BA53085Ref"
+       ]
+      },
+      ".auth.",
+      {
+       "Ref": "AWS::Region"
+      },
+      ".amazoncognito.com"
+     ]
+    ]
+   }
   },
   "oauthScope": {
-   "Value": "[\"profile\",\"phone\",\"email\",\"openid\",\"aws.cognito.signin.user.admin\"]"
+   "Value": "[\"phone\",\"email\",\"openid\",\"profile\",\"aws.cognito.signin.user.admin\"]"
   },
   "oauthRedirectSignIn": {
-   "Value": "https://example.com"
+   "Value": "http://localhost:3001/dashboard"
   },
   "oauthRedirectSignOut": {
-   "Value": ""
+   "Value": "http://localhost:3001/"
   },
   "oauthResponseType": {
    "Value": "code"
@@ -156,7 +173,7 @@
        {
         "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
        },
-       "/bb232d3b072263081a23335a1897844f531d237610dcb08fcc227d0912a16f4e.json"
+       "/0c1f88121ab9e1552450a97fc9310815f89e774543cfce1ea6e5683102f54ea4.json"
       ]
      ]
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getCurrentUser, signOut } from "aws-amplify/auth";
+import { signOut } from "aws-amplify/auth";
 import { Heart, Menu, X, Plus, BarChart3, Users, Settings, LogOut, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -32,8 +32,11 @@ export function Header() {
   useEffect(() => {
     async function load() {
       try {
-        const current = await getCurrentUser();
-        setUser(current);
+        const res = await fetch("/api/user", {
+          credentials: "include"
+        });
+        const data = await res.json();
+        setUser(data.user);
       } catch {
         setUser(null);
       } finally {

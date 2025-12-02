@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/card";
 
 import { toast } from "sonner";
-import { signIn, signOut, signInWithRedirect } from "aws-amplify/auth";
+import { signIn, signOut, signInWithRedirect, fetchAuthSession } from "aws-amplify/auth";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -29,13 +29,42 @@ export default function SignInPage() {
     password: "",
   });
 
-  // AÇÃO DE LOGIN NORMAL
+  // Opcional: se já estiver logado, pula pra dashboard
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const session = await fetchAuthSession();
+        console.log("SESSION NA SIGNIN PAGE:", session);
+        if (session.tokens) {
+          router.replace("/dashboard");
+        }
+      } catch {
+        // sem sessão é ok
+      }
+    }
+    checkSession();
+  }, [router]);
+
+  const handleLoginGoogle = async () => {
+    try {
+      setIsLoading(true);
+      await signInWithRedirect({
+        provider: "Google",
+      });
+      // Daqui pra frente o Cognito assume (redirect pro Hosted UI)
+    } catch (error: any) {
+      console.error("Erro ao iniciar login com Google:", error);
+      toast.error("Erro ao entrar com Google");
+      setIsLoading(false);
+    }
+  };
+
+  // Login normal (email/senha)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Se existir sessão anterior, ignora erro
       try {
         await signOut();
       } catch (_) {}
@@ -45,7 +74,6 @@ export default function SignInPage() {
         password: formData.password,
       });
 
-      // Caso usuário não tenha confirmado email
       if (nextStep?.signInStep === "CONFIRM_SIGN_UP") {
         toast.info("Confirme seu email para continuar.");
         router.push(`/auth/confirmar?email=${formData.email}`);
@@ -74,7 +102,6 @@ export default function SignInPage() {
     }
   };
 
-  // CONTROLAR CAMPOS
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
       ...prev,
@@ -161,7 +188,7 @@ export default function SignInPage() {
 
             <Button
               className="w-full mt-4"
-              onClick={() => signInWithRedirect({ provider: "Google" })}
+              onClick={handleLoginGoogle}
               disabled={isLoading}
             >
               Entrar com Google

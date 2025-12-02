@@ -29,23 +29,7 @@ export function Header() {
   }, []);
 
   // Carrega usuário do Amplify
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch("/api/user", {
-          credentials: "include"
-        });
-        const data = await res.json();
-        setUser(data.user);
-      } catch {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    }
 
-    load();
-  }, []);
 
   if (!mounted || loading) return null; // evita erro de hydration
 

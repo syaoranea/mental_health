@@ -1,4 +1,3 @@
-import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { ddb } from '@/lib/dynamodb'
 import { ScanCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
@@ -71,11 +70,10 @@ async function getRegistrationData(userId: string) {
 
 // ✅ O componente principal precisa ser exportado como default
 export default async function RegistrarPage() {
-  const session = await getServerSession()
 
-  if (!session?.user) {
+/*   if (!session) {
     redirect('/auth/entrar')
-  }
+  } */
 
   const data = await getRegistrationData('2')
 

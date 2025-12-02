@@ -17,7 +17,8 @@ import { RecentMoods } from '@/components/recent-moods'
 import { QuickActions } from '@/components/quick-actions'
 import { formatDate, getMoodColorClass } from '@/lib/utils'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { fetchAuthSession, signInWithRedirect } from 'aws-amplify/auth'
 
 
 interface DashboardData {
@@ -40,26 +41,43 @@ export default function DashboardClient({ data }: DashboardClientProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const searchParams = useSearchParams();
+  const [sessionInfo, setSessionInfo] = useState<any>(null);
+  const [errorInfo, setErrorInfo] = useState<any>(null);
   
- 
   useEffect(() => {
-    async function load() {
+    async function init() {
       try {
-        const res = await fetch("/api/user", {
-          credentials: "include"
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+       if (!idToken) {
+          router.replace('/auth/entrar');
+          return;
+        }
+
+        const res = await fetch('/api/user', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
         });
 
         const data = await res.json();
-        setUser(data);
-      } catch {
-        router.push("/auth/entrar");
+        console.log('Resposta /api/user:', data);
+      } catch (error) {
+        console.error('Erro ao inicializar dashboard:', error);
+        /* router.replace('/auth/entrar'); */
       } finally {
         setLoading(false);
       }
     }
 
-    load();
-  }, []);
+    init();
+  }, [searchParams]);
+
+    const loginGoogle = async () => {
+      await signInWithRedirect({ provider: 'Google' });
+    };
 
   const todayMood = recentMoods.find(mood => {
     const moodDate = new Date(mood.date).toDateString()

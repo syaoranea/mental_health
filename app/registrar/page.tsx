@@ -1,27 +1,13 @@
 import { redirect } from 'next/navigation'
 import { ddb } from '@/lib/dynamodb'
-import { ScanCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { MoodRegistrationClient } from '@/components/mood-registration-client'
 
 export const dynamic = 'force-dynamic'
 
-// Função auxiliar (pode ficar aqui mesmo)
 async function getRegistrationData(userId: string) {
   try {
-    // Buscar categorias (as do usuário e as globais)
-    const categoriesResult = await ddb.send(
-      new ScanCommand({
-        TableName: 'Categories',
-        FilterExpression: 'attribute_not_exists(userId) OR userId = :uid',
-        ExpressionAttributeValues: {
-          ':uid': userId,
-        },
-      })
-    )
-
-    const categories = categoriesResult.Items || []
-
-    // Buscar registro de hoje
+    // 1) Buscar registro de hoje (MoodRecords)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
@@ -45,14 +31,18 @@ async function getRegistrationData(userId: string) {
 
     const todayRecord = recordsResult.Items?.[0]
 
+    // 2) Atividades (por enquanto hardcoded, depois você pode buscar de outra tabela)
+    const categories = [
+      { id: '1', name: 'Exercício físico', icon: '🏃', type: 'predefined' as const, isCustom: false },
+      { id: '2', name: 'Meditação', icon: '🧘', type: 'predefined' as const, isCustom: false },
+      { id: '3', name: 'Leitura', icon: '📚', type: 'predefined' as const, isCustom: false },
+      { id: '4', name: 'Trabalho', icon: '💼', type: 'predefined' as const, isCustom: false },
+      { id: '5', name: 'Socialização', icon: '👥', type: 'predefined' as const, isCustom: false },
+      { id: '6', name: 'Hobbies', icon: '🎨', type: 'predefined' as const, isCustom: false },
+    ]
+
     return {
-      categories: categories.map((cat) => ({
-        id: cat.id,
-        name: cat.name,
-        icon: cat.icon || '',
-        type: cat.type,
-        isCustom: !!cat.isCustom,
-      })),
+      categories,
       existingRecord: todayRecord
         ? {
             ...todayRecord,
@@ -63,23 +53,12 @@ async function getRegistrationData(userId: string) {
         : null,
     }
   } catch (error) {
-    console.error('Registration data error:', error)
+    console.error('❌ Registration data error:', error)
     return { categories: [], existingRecord: null }
   }
 }
 
-// ✅ O componente principal precisa ser exportado como default
 export default async function RegistrarPage() {
-
-/*   if (!session) {
-    redirect('/auth/entrar')
-  } */
-
-  const data = await getRegistrationData('2')
-
+  const data = await getRegistrationData('google_116737357434516142663')
   return <MoodRegistrationClient data={data} />
 }
-
-
-
-

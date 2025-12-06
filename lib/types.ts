@@ -72,7 +72,7 @@ export const DEFAULT_CATEGORIES: Omit<CategoryOption, 'id'>[] = [
 
 // Descriptive mood words
 export const MOOD_WORDS = [
-  'esperança', 'gratidão', 'paz', 'felicidade', 'energia',
+  'esperança', 'gratidão', 'paze', 'felicidade', 'energia',
   'tristeza', 'ansiedade', 'stress', 'frustração', 'medo',
   'calma', 'otimismo', 'contentamento', 'serenidade', 'alegria',
   'preocupação', 'nervosismo', 'irritação', 'desânimo', 'solidão',

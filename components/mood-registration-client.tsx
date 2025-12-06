@@ -1,8 +1,8 @@
 
 'use client'
 
-import { useState } from 'react'
-import { Heart, Save, Camera, Smile, Type, Sliders, Activity } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Heart, Save, Camera, Smile, Type, Sliders, Activity, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -13,8 +13,17 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { EMOTION_OPTIONS, MOOD_WORDS } from '@/lib/types'
+import { EMOTION_OPTIONS} from '@/lib/types'
 import { getMoodColorClass, getMoodBgColorClass } from '@/lib/utils'
+import { fetchAuthSession } from 'aws-amplify/auth'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 
 const Header = dynamic(() => import('@/components/header').then(mod => ({ default: mod.Header })), {
   ssr: false,
@@ -43,12 +52,151 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
   // Form state
   const [moodScale, setMoodScale] = useState<number[]>(data.existingRecord?.numericScale ? [data.existingRecord.numericScale] : [5])
   const [selectedEmojis, setSelectedEmojis] = useState<string[]>(data.existingRecord?.emojis || [])
-  const [selectedWords, setSelectedWords] = useState<string[]>(data.existingRecord?.descriptiveWords || [])
+  //const [selectedWords, setSelectedWords] = useState<string[]>(data.existingRecord?.descriptiveWords || [])
   const [notes, setNotes] = useState(data.existingRecord?.notes || '')
   const [selectedActivities, setSelectedActivities] = useState<string[]>(
     data.existingRecord?.activities?.map((a: any) => a.categoryId) || []
   )
   const [isPrivate, setIsPrivate] = useState(data.existingRecord?.isPrivate || false)
+  const [words, setWords] = useState<string[]>([]);
+  const [selectedWords, setSelectedWords] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [manageOpen, setManageOpen] = useState(false)
+  const [managedWords, setManagedWords] = useState<string[]>([])
+  const [newWord, setNewWord] = useState("")
+
+// abrir tela agnóstica de gestão
+const handleAddSentimento = () => {
+  setManagedWords(words) // começa com a lista atual
+  setNewWord("")
+  setManageOpen(true)
+}
+
+const handleEditSentimentos = () => {
+  // se quiser usar a mesma tela para "editar sentimentos"
+  setManagedWords(words)
+  setManageOpen(true)
+}
+
+const handleReorderSentimentos = () => {
+  // idem – mesma tela cobre reordenar também
+  setManagedWords(words)
+  setManageOpen(true)
+}
+
+const handleManagedChange = (index: number, value: string) => {
+  setManagedWords(prev => {
+    const copy = [...prev]
+    copy[index] = value
+    return copy
+  })
+}
+
+const handleManagedRemove = (index: number) => {
+  setManagedWords(prev => prev.filter((_, i) => i !== index))
+}
+
+const moveManagedItem = (index: number, direction: "up" | "down") => {
+  setManagedWords(prev => {
+    const copy = [...prev]
+    const newIndex = direction === "up" ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= copy.length) return prev
+    const temp = copy[index]
+    copy[index] = copy[newIndex]
+    copy[newIndex] = temp
+    return copy
+  })
+}
+
+const handleAddNewManagedWord = () => {
+  const trimmed = newWord.trim()
+  if (!trimmed) return
+  setManagedWords(prev => (prev.includes(trimmed) ? prev : [...prev, trimmed]))
+  setNewWord("")
+}
+
+const handleSaveManaged = async () => {
+  try {
+    const { tokens } = await fetchAuthSession()
+    const idToken = tokens?.idToken?.toString()
+    if (!idToken) throw new Error('sem token')
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    }
+
+    const previous = words          // lista antes da edição
+    const current = managedWords    // lista na tela (ordenada)
+
+    const removed = previous.filter((w) => !current.includes(w))
+    const added   = current.filter((w) => !previous.includes(w))
+
+    console.log('💾 [client] previous:', previous)
+    console.log('💾 [client] current:', current)
+    console.log('💾 [client] removed:', removed)
+    console.log('💾 [client] added:', added)
+
+    // 1) apagar removidos (não importa ordem)
+    await Promise.all(
+      removed.map((text) =>
+        fetch('/api/mood-words', {
+          method: 'DELETE',
+          headers,
+          body: JSON.stringify({ text }),
+        })
+      )
+    )
+
+    // 2) para TODO mundo em current, mandar PUT com order correto
+    // (inclui adicionados e existentes)
+    await Promise.all(
+      current.map((text, index) =>
+        fetch('/api/mood-words', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ text, order: index }),
+        })
+      )
+    )
+
+    setWords([...current])
+    setSelectedWords((prev) => prev.filter((w) => current.includes(w)))
+    setManageOpen(false)
+  } catch (err) {
+    console.error('❌ [client] Erro ao salvar sentimentos:', err)
+  }
+}
+
+useEffect(() => {
+  async function fetchWords() {
+    try {
+      const { tokens } = await fetchAuthSession()
+      const idToken = tokens?.idToken?.toString()
+
+      const headers: HeadersInit = {}
+      if (idToken) {
+        headers['Authorization'] = `Bearer ${idToken}`
+      }
+      console.log(headers)
+      const res = await fetch('/api/mood-words', { headers })
+      const data = await res.json()
+      console.log(data, 'emo')
+
+      if (data.success && data.words) {
+        setWords(data.words)
+      } else {
+        console.error('Erro ao carregar palavras:', data.error)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar mood words:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  fetchWords()
+}, [])
 
   const handleEmojiToggle = (emoji: string) => {
     setSelectedEmojis(prev => 
@@ -212,30 +360,161 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
           {/* Descriptive Words */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Type className="w-5 h-5 text-primary" />
-                Palavras Descritivas
+              <CardTitle className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Type className="w-5 h-5 text-primary" />
+                  <span>Palavras Descritivas</span>
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7 rounded-full p-0"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleAddSentimento}>
+                      Adicionar sentimentos
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleEditSentimentos}>
+                      Editar sentimentos
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleReorderSentimentos}>
+                      Reordenar sentimentos
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardTitle>
+
               <CardDescription>
                 Selecione palavras que descrevem seus sentimentos
               </CardDescription>
             </CardHeader>
+
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {MOOD_WORDS.map((word) => (
-                  <Badge
-                    key={word}
-                    variant={selectedWords.includes(word) ? "default" : "outline"}
-                    className="cursor-pointer hover:bg-primary/80"
-                    onClick={() => handleWordToggle(word)}
-                  >
-                    {word}
-                  </Badge>
-                ))}
-              </div>
+              {loading ? (
+                <div className="flex flex-wrap gap-2">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-6 w-20 bg-muted animate-pulse rounded-full"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {words.map((word) => (
+                    <Badge
+                      key={word}
+                      variant={selectedWords.includes(word) ? "default" : "outline"}
+                      className="cursor-pointer hover:bg-primary/80"
+                      onClick={() => handleWordToggle(word)}
+                    >
+                      {word}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
+          <Dialog open={manageOpen} onOpenChange={setManageOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Gerenciar sentimentos</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {/* Adicionar novo */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Novo sentimento"
+                    value={newWord}
+                    onChange={(e) => setNewWord(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        handleAddNewManagedWord()
+                      }
+                    }}
+                  />
+                  <Button type="button" onClick={handleAddNewManagedWord}>
+                    Adicionar
+                  </Button>
+                </div>
+
+                {/* Lista editável / reordenável */}
+                {managedWords.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum sentimento cadastrado ainda.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {managedWords.map((word, index) => (
+                      <div
+                        key={word + index}
+                        className="flex items-center gap-2"
+                      >
+                        <Input
+                          value={word}
+                          onChange={(e) =>
+                            handleManagedChange(index, e.target.value)
+                          }
+                          className="flex-1"
+                        />
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            onClick={() => moveManagedItem(index, "up")}
+                            disabled={index === 0}
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            onClick={() => moveManagedItem(index, "down")}
+                            disabled={index === managedWords.length - 1}
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            onClick={() => handleManagedRemove(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setManageOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={handleSaveManaged}>
+                  Salvar alterações
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           {/* Activities */}
           <Card>
             <CardHeader>

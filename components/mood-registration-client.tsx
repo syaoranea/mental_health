@@ -30,7 +30,7 @@ const Header = dynamic(() => import('@/components/header').then(mod => ({ defaul
   loading: () => <div className="h-16 bg-white border-b border-gray-200"></div>
 })
 
-interface MoodRegistrationData {
+export interface MoodRegistrationData {
   categories: Array<{
     id: string
     name: string

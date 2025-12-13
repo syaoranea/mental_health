@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { ddb } from '@/lib/dynamodb'
 import { QueryCommand } from '@aws-sdk/lib-dynamodb'
-import { MoodRegistrationClient } from '@/components/mood-registration-client'
+import { MoodRegistrationClient, MoodRegistrationData } from '@/components/mood-registration-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,5 +78,4 @@ const categories = [
 
 export default async function RegistrarPage() {
   const data = await getRegistrationData('google_116737357434516142663')
-  return <MoodRegistrationClient data={data} />
-}
+return <MoodRegistrationClient data={data as MoodRegistrationData} />}

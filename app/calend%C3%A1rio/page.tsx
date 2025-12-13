@@ -1,13 +1,15 @@
 
-import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/lib/auth-options'
 import { CalendarPageClient } from '@/components/calendar-page-client'
+import { fetchAuthSession } from 'aws-amplify/auth'
 
 export default async function CalendarPage() {
-  const session = await getServerSession(authOptions)
+  const { tokens } = await fetchAuthSession()
+  const idToken = tokens?.idToken?.toString()
+  if (!idToken) throw new Error('sem token')
+  
 
-  if (!session?.user) {
+  if (!idToken) {
     redirect('/auth/entrar')
   }
 

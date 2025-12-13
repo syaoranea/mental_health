@@ -1,8 +1,16 @@
-import { GetCommand } from '@aws-sdk/lib-dynamodb'
-import { ddb } from '@/lib/dynamodb'
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
+import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb'
 
-const TABLE_NAME = 'FeatureToggles'
+const TABLE_NAME = process.env.DDB_FEATURE_TOGGLES_TABLE || 'AppSettings'
 const DEFAULT_TTL_MS = 5 * 60 * 1000
+
+
+const client = new DynamoDBClient({
+  region: process.env.AWS_REGION || 'us-east-1',
+})
+const ddb = DynamoDBDocumentClient.from(client)
+
+console.log(`🔐 DynamoDB client configurado em ${process.env.AWS_REGION || 'us-east-1'}`)
 
 interface CacheEntry {
   toggles: Record<string, boolean>
@@ -39,46 +47,57 @@ export function isCacheValid(appId: string): boolean {
 
 async function fetchTogglesFromDynamoDB(appId: string): Promise<Record<string, boolean>> {
   console.log(`[feature-toggles] Fetching toggles from DynamoDB for appId: ${appId}`)
-  
-  const result = await ddb.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: { appId },
-    })
-  )
+  console.log(`[feature-toggles] Using table: ${TABLE_NAME}`)
 
-  if (!result.Item) {
-    console.log(`[feature-toggles] No toggles found for appId: ${appId}`)
-    return {}
-  }
+  try {
+    const result = await ddb.send(
+      new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { appId },
+      })
+    )
 
-  const toggles = result.Item.toggles || {}
-  console.log(`[feature-toggles] Toggles fetched:`, toggles)
-  
-  const normalizedToggles: Record<string, boolean> = {}
-  for (const [key, value] of Object.entries(toggles)) {
-    if (typeof value === 'boolean') {
-      normalizedToggles[key] = value
-    } else if (typeof value === 'object' && value !== null && 'BOOL' in value) {
-      normalizedToggles[key] = (value as { BOOL: boolean }).BOOL
+    if (!result.Item) {
+      console.log(`[feature-toggles] No toggles found for appId: ${appId}`)
+      return {}
     }
+
+    const toggles = result.Item.toggles || {}
+    console.log(`[feature-toggles] Toggles fetched:`, toggles)
+
+    // Normalizar valores (caso venham em formato DynamoDB nativo)
+    const normalizedToggles: Record<string, boolean> = {}
+    for (const [key, value] of Object.entries(toggles)) {
+      if (typeof value === 'boolean') {
+        normalizedToggles[key] = value
+      } else if (typeof value === 'object' && value !== null && 'BOOL' in value) {
+        normalizedToggles[key] = (value as { BOOL: boolean }).BOOL
+      }
+    }
+
+    return normalizedToggles
+  } catch (err: any) {
+    if (err.name === 'ResourceNotFoundException') {
+      console.error(
+        `❌ Tabela não encontrada: ${TABLE_NAME}. Verifique se a tabela existe e o nome/região estão corretos.`
+      )
+    }
+    throw err
   }
-  
-  return normalizedToggles
 }
 
 export async function getToggles(appId: string): Promise<Record<string, boolean>> {
   const cachedEntry = cache.get(appId)
-  
+
   if (cachedEntry && Date.now() < cachedEntry.expiresAt) {
     console.log(`[feature-toggles] Cache hit for appId: ${appId}`)
     return cachedEntry.toggles
   }
 
   console.log(`[feature-toggles] Cache miss for appId: ${appId}`)
-  
+
   const toggles = await fetchTogglesFromDynamoDB(appId)
-  
+
   cache.set(appId, {
     toggles,
     expiresAt: Date.now() + configuredTtlMs,

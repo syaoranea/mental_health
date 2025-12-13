@@ -376,6 +376,7 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
         try {
           const resToggle = await fetch('/api/feature-toggles?toggle=registroPrivado')
           const dataToggle = await resToggle.json()
+          console.log('🔍 feature toggle registroPrivado:', dataToggle)
           if (dataToggle.success && dataToggle.value === true) {
             setHidePrivateSection(true)
           }

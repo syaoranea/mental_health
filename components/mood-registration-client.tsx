@@ -53,6 +53,16 @@ interface ActivityItem {
   isCustom: boolean
 }
 
+interface EmotionItem {
+  id: string
+  emoji: string
+  label: string
+  value: string
+  type: 'predefined' | 'custom'
+  isCustom: boolean
+  order?: number
+}
+
 export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -86,6 +96,26 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
 
   // Feature toggle - Registro privado
   const [hidePrivateSection, setHidePrivateSection] = useState(false)
+
+  // Emoções
+  const [emotions, setEmotions] = useState<EmotionItem[]>(() => 
+    EMOTION_OPTIONS.map((e, index) => ({
+      id: e.value,
+      emoji: e.emoji,
+      label: e.label,
+      value: e.value,
+      type: 'predefined' as const,
+      isCustom: false,
+      order: index,
+    }))
+  )
+  const [loadingEmotions, setLoadingEmotions] = useState(true)
+
+  // Emoções modal
+  const [manageEmotionsOpen, setManageEmotionsOpen] = useState(false)
+  const [managedEmotions, setManagedEmotions] = useState<EmotionItem[]>([])
+  const [newEmotionEmoji, setNewEmotionEmoji] = useState("")
+  const [newEmotionLabel, setNewEmotionLabel] = useState("")
 
   // ──────────────────────────────────────────────────────────────
   // SENTIMENTOS
@@ -184,6 +214,180 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
     } catch (err) {
       console.error('❌ [client] Erro ao salvar sentimentos:', err)
       toast.error('Erro ao salvar sentimentos')
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // EMOÇÕES
+  // ──────────────────────────────────────────────────────────────
+  const handleAddEmocao = () => {
+    setManagedEmotions([...emotions])
+    setNewEmotionEmoji("")
+    setNewEmotionLabel("")
+    setManageEmotionsOpen(true)
+  }
+
+  const handleEditEmocoes = () => {
+    setManagedEmotions([...emotions])
+    setManageEmotionsOpen(true)
+  }
+
+  const handleReorderEmocoes = () => {
+    setManagedEmotions([...emotions])
+    setManageEmotionsOpen(true)
+  }
+
+  const handleManagedEmotionChange = (index: number, field: 'emoji' | 'label', value: string) => {
+    setManagedEmotions(prev => {
+      const copy = [...prev]
+      copy[index] = { ...copy[index], [field]: value }
+      return copy
+    })
+  }
+
+  const handleManagedEmotionRemove = (index: number) => {
+    const emotion = managedEmotions[index]
+    
+    if (!emotion.isCustom) {
+      toast.error('Não é possível excluir emoções pré-definidas')
+      return
+    }
+
+    setManagedEmotions(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const moveManagedEmotion = (index: number, direction: "up" | "down") => {
+    setManagedEmotions(prev => {
+      const copy = [...prev]
+      const newIndex = direction === "up" ? index - 1 : index + 1
+      if (newIndex < 0 || newIndex >= copy.length) return prev
+      const temp = copy[index]
+      copy[index] = copy[newIndex]
+      copy[newIndex] = temp
+      return copy
+    })
+  }
+
+  const handleAddNewManagedEmotion = () => {
+    const emoji = newEmotionEmoji.trim() || '😊'
+    const label = newEmotionLabel.trim()
+    
+    if (!label) return
+
+    const value = label
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, '_')
+
+    const newEmotion: EmotionItem = {
+      id: `temp-${Date.now()}`,
+      emoji,
+      label,
+      value,
+      type: 'custom',
+      isCustom: true,
+      order: managedEmotions.length,
+    }
+
+    setManagedEmotions(prev => [...prev, newEmotion])
+    setNewEmotionEmoji("")
+    setNewEmotionLabel("")
+  }
+
+  const handleSaveManagedEmotions = async () => {
+    try {
+      const { tokens } = await fetchAuthSession()
+      const idToken = tokens?.idToken?.toString()
+      if (!idToken) throw new Error('sem token')
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      }
+
+      const previous = emotions.filter(e => e.isCustom)
+      const current = managedEmotions.filter(e => e.isCustom)
+
+      // Emoções removidas (só customizadas)
+      const removed = previous.filter(
+        (p) => !current.find((c) => c.id === p.id)
+      )
+
+      // Emoções novas (id começa com 'temp-')
+      const added = current.filter((c) => c.id.startsWith('temp-'))
+
+      // Emoções editadas (emoji ou label mudou)
+      const edited = current.filter((c) => {
+        if (c.id.startsWith('temp-')) return false
+        const prev = previous.find((p) => p.id === c.id)
+        return prev && (prev.emoji !== c.emoji || prev.label !== c.label)
+      })
+
+      console.log('💾 [client] emotions removed:', removed)
+      console.log('💾 [client] emotions added:', added)
+      console.log('💾 [client] emotions edited:', edited)
+
+      // DELETE
+      await Promise.all(
+        removed.map((em) =>
+          fetch('/api/emotions', {
+            method: 'DELETE',
+            headers,
+            body: JSON.stringify({ id: em.id }),
+          })
+        )
+      )
+
+      // POST (criar novas)
+      const createdEmotions = await Promise.all(
+        added.map(async (em, idx) => {
+          const res = await fetch('/api/emotions', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ 
+              emoji: em.emoji, 
+              label: em.label,
+              order: managedEmotions.findIndex(m => m.id === em.id),
+            }),
+          })
+          const json = await res.json()
+          return json.emotion
+        })
+      )
+
+      // PUT (editar existentes)
+      await Promise.all(
+        edited.map((em) =>
+          fetch('/api/emotions', {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ 
+              id: em.id, 
+              emoji: em.emoji, 
+              label: em.label,
+              order: managedEmotions.findIndex(m => m.id === em.id),
+            }),
+          })
+        )
+      )
+
+      // Atualizar estado local - manter predefinidas + customizadas atualizadas
+      const predefined = managedEmotions.filter(e => !e.isCustom)
+      let customUpdated = current.filter((c) => !c.id.startsWith('temp-'))
+      customUpdated = [...customUpdated, ...createdEmotions.filter(Boolean)]
+
+      const updatedEmotions = [...predefined, ...customUpdated]
+      
+      setEmotions(updatedEmotions)
+      setSelectedEmojis((prev) =>
+        prev.filter((emoji) => updatedEmotions.find((e) => e.emoji === emoji))
+      )
+      setManageEmotionsOpen(false)
+      toast.success('Emoções salvas!')
+    } catch (err) {
+      console.error('❌ [client] Erro ao salvar emoções:', err)
+      toast.error('Erro ao salvar emoções')
     }
   }
 
@@ -346,7 +550,7 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
   // FETCH INICIAL
   // ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    async function fetchWords() {
+    async function fetchData() {
       try {
         const { tokens } = await fetchAuthSession()
         const idToken = tokens?.idToken?.toString()
@@ -372,6 +576,40 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
           console.error('Erro ao carregar palavras:', data.error)
         }
 
+        // Fetch emoções customizadas
+        try {
+          const resEmotions = await fetch('/api/emotions', { headers })
+          const dataEmotions = await resEmotions.json()
+          console.log('🔍 emotions from API:', dataEmotions)
+          
+          if (dataEmotions.success && Array.isArray(dataEmotions.emotions)) {
+            // Combinar emoções predefinidas com customizadas
+            const predefinedEmotions: EmotionItem[] = EMOTION_OPTIONS.map((e, index) => ({
+              id: e.value,
+              emoji: e.emoji,
+              label: e.label,
+              value: e.value,
+              type: 'predefined' as const,
+              isCustom: false,
+              order: index,
+            }))
+            
+            const customEmotions: EmotionItem[] = dataEmotions.emotions.map((e: any) => ({
+              id: e.id || e.emotionId,
+              emoji: e.emoji,
+              label: e.label,
+              value: e.value,
+              type: 'custom' as const,
+              isCustom: true,
+              order: e.order ?? 999,
+            }))
+            
+            setEmotions([...predefinedEmotions, ...customEmotions])
+          }
+        } catch (emotionsError) {
+          console.error('Erro ao buscar emoções:', emotionsError)
+        }
+
         // Fetch feature toggle for registro privado
         try {
           const resToggle = await fetch('/api/feature-toggles?toggle=registroPrivado')
@@ -384,14 +622,15 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
           console.error('Erro ao buscar feature toggle:', toggleError)
         }
       } catch (error) {
-        console.error('Erro ao buscar mood words:', error)
+        console.error('Erro ao buscar dados:', error)
       } finally {
         setLoading(false)
         setLoadingActivities(false)
+        setLoadingEmotions(false)
       }
     }
 
-    fetchWords()
+    fetchData()
   }, [])
 
   const handleEmojiToggle = (emoji: string) => {
@@ -525,33 +764,181 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
           {/* Emotions */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Smile className="w-5 h-5 text-primary" />
-                Emoções
+              <CardTitle className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Smile className="w-5 h-5 text-primary" />
+                  <span>Emoções</span>
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7 rounded-full p-0"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleAddEmocao}>
+                      Adicionar emoções
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleEditEmocoes}>
+                      Editar emoções
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleReorderEmocoes}>
+                      Reordenar emoções
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardTitle>
               <CardDescription>
                 Escolha os emojis que melhor descrevem como você se sente
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-5 sm:grid-cols-10 gap-3">
-                {EMOTION_OPTIONS.map((emotion) => (
-                  <button
-                    key={emotion.value}
-                    onClick={() => handleEmojiToggle(emotion.emoji)}
-                    className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${
-                      selectedEmojis.includes(emotion.emoji)
-                        ? 'border-primary bg-primary/10'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <span className="text-2xl mb-1">{emotion.emoji}</span>
-                    <span className="text-xs text-gray-600">{emotion.label}</span>
-                  </button>
-                ))}
-              </div>
+              {loadingEmotions ? (
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-3">
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-3">
+                  {emotions.map((emotion) => (
+                    <button
+                      key={emotion.id}
+                      onClick={() => handleEmojiToggle(emotion.emoji)}
+                      className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all ${
+                        selectedEmojis.includes(emotion.emoji)
+                          ? 'border-primary bg-primary/10'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-2xl mb-1">{emotion.emoji}</span>
+                      <span className="text-xs text-gray-600">{emotion.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Modal Emoções */}
+          <Dialog open={manageEmotionsOpen} onOpenChange={setManageEmotionsOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Gerenciar emoções</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Emoji"
+                    value={newEmotionEmoji}
+                    onChange={(e) => setNewEmotionEmoji(e.target.value)}
+                    className="w-20 text-center"
+                  />
+                  <Input
+                    placeholder="Nome da emoção"
+                    value={newEmotionLabel}
+                    onChange={(e) => setNewEmotionLabel(e.target.value)}
+                    className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        handleAddNewManagedEmotion()
+                      }
+                    }}
+                  />
+                  <Button type="button" onClick={handleAddNewManagedEmotion}>
+                    Adicionar
+                  </Button>
+                </div>
+
+                {managedEmotions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhuma emoção cadastrada ainda.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                    {managedEmotions.map((emotion, index) => (
+                      <div
+                        key={emotion.id + index}
+                        className="flex items-center gap-2"
+                      >
+                        <Input
+                          value={emotion.emoji}
+                          onChange={(e) =>
+                            handleManagedEmotionChange(index, 'emoji', e.target.value)
+                          }
+                          className="w-16 text-center"
+                          disabled={!emotion.isCustom}
+                        />
+                        <Input
+                          value={emotion.label}
+                          onChange={(e) =>
+                            handleManagedEmotionChange(index, 'label', e.target.value)
+                          }
+                          className="flex-1"
+                          disabled={!emotion.isCustom}
+                        />
+                        {emotion.isCustom && (
+                          <Badge variant="secondary" className="text-xs">
+                            custom
+                          </Badge>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            onClick={() => moveManagedEmotion(index, "up")}
+                            disabled={index === 0}
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            onClick={() => moveManagedEmotion(index, "down")}
+                            disabled={index === managedEmotions.length - 1}
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            onClick={() => handleManagedEmotionRemove(index)}
+                            disabled={!emotion.isCustom}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setManageEmotionsOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={handleSaveManagedEmotions}>
+                  Salvar alterações
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Descriptive Words */}
           <Card>

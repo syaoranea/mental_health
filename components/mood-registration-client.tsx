@@ -84,6 +84,9 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
   const [newActivityName, setNewActivityName] = useState("")
   const [newActivityIcon, setNewActivityIcon] = useState("")
 
+  // Feature toggle - Registro privado
+  const [hidePrivateSection, setHidePrivateSection] = useState(false)
+
   // ──────────────────────────────────────────────────────────────
   // SENTIMENTOS
   // ──────────────────────────────────────────────────────────────
@@ -367,6 +370,17 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
           setWords(data.words)
         } else {
           console.error('Erro ao carregar palavras:', data.error)
+        }
+
+        // Fetch feature toggle for registro privado
+        try {
+          const resToggle = await fetch('/api/feature-toggles?toggle=registroPrivado')
+          const dataToggle = await resToggle.json()
+          if (dataToggle.success && dataToggle.value === true) {
+            setHidePrivateSection(true)
+          }
+        } catch (toggleError) {
+          console.error('Erro ao buscar feature toggle:', toggleError)
         }
       } catch (error) {
         console.error('Erro ao buscar mood words:', error)
@@ -894,24 +908,26 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
             </CardContent>
           </Card>
 
-          {/* Privacy */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center space-x-3">
-                <Checkbox
-                  id="private"
-                  checked={isPrivate}
-                  onCheckedChange={(checked) => setIsPrivate(checked === true)}
-                />
-                <Label htmlFor="private" className="cursor-pointer flex-1">
-                  <div className="font-medium">Registro privado</div>
-                  <div className="text-sm text-gray-500">
-                    Este registro não será compartilhado com ninguém que tenha acesso aos seus dados
-                  </div>
-                </Label>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Privacy - conditionally rendered based on feature toggle */}
+          {!hidePrivateSection && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="private"
+                    checked={isPrivate}
+                    onCheckedChange={(checked) => setIsPrivate(checked === true)}
+                  />
+                  <Label htmlFor="private" className="cursor-pointer flex-1">
+                    <div className="font-medium">Registro privado</div>
+                    <div className="text-sm text-gray-500">
+                      Este registro não será compartilhado com ninguém que tenha acesso aos seus dados
+                    </div>
+                  </Label>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Actions */}
           <div className="flex gap-4 justify-center pb-8">

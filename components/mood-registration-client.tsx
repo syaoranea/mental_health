@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -24,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const Header = dynamic(() => import('@/components/header').then(mod => ({ default: mod.Header })), {
   ssr: false,
@@ -45,6 +45,14 @@ interface MoodRegistrationClientProps {
   data: MoodRegistrationData
 }
 
+interface ActivityItem {
+  id: string
+  name: string
+  icon: string
+  type: 'predefined' | 'custom'
+  isCustom: boolean
+}
+
 export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -52,7 +60,6 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
   // Form state
   const [moodScale, setMoodScale] = useState<number[]>(data.existingRecord?.numericScale ? [data.existingRecord.numericScale] : [5])
   const [selectedEmojis, setSelectedEmojis] = useState<string[]>(data.existingRecord?.emojis || [])
-  //const [selectedWords, setSelectedWords] = useState<string[]>(data.existingRecord?.descriptiveWords || [])
   const [notes, setNotes] = useState(data.existingRecord?.notes || '')
   const [selectedActivities, setSelectedActivities] = useState<string[]>(
     data.existingRecord?.activities?.map((a: any) => a.categoryId) || []
@@ -61,142 +68,316 @@ export function MoodRegistrationClient({ data }: MoodRegistrationClientProps) {
   const [words, setWords] = useState<string[]>([]);
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingActivities, setLoadingActivities] = useState(true);
+  
+  // Sentimentos modal
   const [manageOpen, setManageOpen] = useState(false)
   const [managedWords, setManagedWords] = useState<string[]>([])
   const [newWord, setNewWord] = useState("")
+  
+  // Atividades
+  const [categories, setCategories] = useState<ActivityItem[]>(data.categories)
+  
+  // Atividades modal
+  const [manageActivitiesOpen, setManageActivitiesOpen] = useState(false)
+  const [managedActivities, setManagedActivities] = useState<ActivityItem[]>([])
+  const [newActivityName, setNewActivityName] = useState("")
+  const [newActivityIcon, setNewActivityIcon] = useState("")
 
-// abrir tela agnóstica de gestão
-const handleAddSentimento = () => {
-  setManagedWords(words) // começa com a lista atual
-  setNewWord("")
-  setManageOpen(true)
-}
-
-const handleEditSentimentos = () => {
-  // se quiser usar a mesma tela para "editar sentimentos"
-  setManagedWords(words)
-  setManageOpen(true)
-}
-
-const handleReorderSentimentos = () => {
-  // idem – mesma tela cobre reordenar também
-  setManagedWords(words)
-  setManageOpen(true)
-}
-
-const handleManagedChange = (index: number, value: string) => {
-  setManagedWords(prev => {
-    const copy = [...prev]
-    copy[index] = value
-    return copy
-  })
-}
-
-const handleManagedRemove = (index: number) => {
-  setManagedWords(prev => prev.filter((_, i) => i !== index))
-}
-
-const moveManagedItem = (index: number, direction: "up" | "down") => {
-  setManagedWords(prev => {
-    const copy = [...prev]
-    const newIndex = direction === "up" ? index - 1 : index + 1
-    if (newIndex < 0 || newIndex >= copy.length) return prev
-    const temp = copy[index]
-    copy[index] = copy[newIndex]
-    copy[newIndex] = temp
-    return copy
-  })
-}
-
-const handleAddNewManagedWord = () => {
-  const trimmed = newWord.trim()
-  if (!trimmed) return
-  setManagedWords(prev => (prev.includes(trimmed) ? prev : [...prev, trimmed]))
-  setNewWord("")
-}
-
-const handleSaveManaged = async () => {
-  try {
-    const { tokens } = await fetchAuthSession()
-    const idToken = tokens?.idToken?.toString()
-    if (!idToken) throw new Error('sem token')
-
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${idToken}`,
-    }
-
-    const previous = words          // lista antes da edição
-    const current = managedWords    // lista na tela (ordenada)
-
-    const removed = previous.filter((w) => !current.includes(w))
-    const added   = current.filter((w) => !previous.includes(w))
-
-    console.log('💾 [client] previous:', previous)
-    console.log('💾 [client] current:', current)
-    console.log('💾 [client] removed:', removed)
-    console.log('💾 [client] added:', added)
-
-    // 1) apagar removidos (não importa ordem)
-    await Promise.all(
-      removed.map((text) =>
-        fetch('/api/mood-words', {
-          method: 'DELETE',
-          headers,
-          body: JSON.stringify({ text }),
-        })
-      )
-    )
-
-    // 2) para TODO mundo em current, mandar PUT com order correto
-    // (inclui adicionados e existentes)
-    await Promise.all(
-      current.map((text, index) =>
-        fetch('/api/mood-words', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ text, order: index }),
-        })
-      )
-    )
-
-    setWords([...current])
-    setSelectedWords((prev) => prev.filter((w) => current.includes(w)))
-    setManageOpen(false)
-  } catch (err) {
-    console.error('❌ [client] Erro ao salvar sentimentos:', err)
+  // ──────────────────────────────────────────────────────────────
+  // SENTIMENTOS
+  // ──────────────────────────────────────────────────────────────
+  const handleAddSentimento = () => {
+    setManagedWords(words)
+    setNewWord("")
+    setManageOpen(true)
   }
-}
 
-useEffect(() => {
-  async function fetchWords() {
+  const handleEditSentimentos = () => {
+    setManagedWords(words)
+    setManageOpen(true)
+  }
+
+  const handleReorderSentimentos = () => {
+    setManagedWords(words)
+    setManageOpen(true)
+  }
+
+  const handleManagedChange = (index: number, value: string) => {
+    setManagedWords(prev => {
+      const copy = [...prev]
+      copy[index] = value
+      return copy
+    })
+  }
+
+  const handleManagedRemove = (index: number) => {
+    setManagedWords(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const moveManagedItem = (index: number, direction: "up" | "down") => {
+    setManagedWords(prev => {
+      const copy = [...prev]
+      const newIndex = direction === "up" ? index - 1 : index + 1
+      if (newIndex < 0 || newIndex >= copy.length) return prev
+      const temp = copy[index]
+      copy[index] = copy[newIndex]
+      copy[newIndex] = temp
+      return copy
+    })
+  }
+
+  const handleAddNewManagedWord = () => {
+    const trimmed = newWord.trim()
+    if (!trimmed) return
+    setManagedWords(prev => (prev.includes(trimmed) ? prev : [...prev, trimmed]))
+    setNewWord("")
+  }
+
+  const handleSaveManaged = async () => {
     try {
       const { tokens } = await fetchAuthSession()
       const idToken = tokens?.idToken?.toString()
+      if (!idToken) throw new Error('sem token')
 
-      const headers: HeadersInit = {}
-      if (idToken) {
-        headers['Authorization'] = `Bearer ${idToken}`
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
       }
-      console.log(headers)
-      const res = await fetch('/api/mood-words', { headers })
-      const data = await res.json()
-      console.log(data, 'emo')
 
-      if (data.success && data.words) {
-        setWords(data.words)
-      } else {
-        console.error('Erro ao carregar palavras:', data.error)
-      }
-    } catch (error) {
-      console.error('Erro ao buscar mood words:', error)
-    } finally {
-      setLoading(false)
+      const previous = words
+      const current = managedWords
+
+      const removed = previous.filter((w) => !current.includes(w))
+
+      console.log('💾 [client] previous:', previous)
+      console.log('💾 [client] current:', current)
+      console.log('💾 [client] removed:', removed)
+
+      await Promise.all(
+        removed.map((text) =>
+          fetch('/api/mood-words', {
+            method: 'DELETE',
+            headers,
+            body: JSON.stringify({ text }),
+          })
+        )
+      )
+
+      await Promise.all(
+        current.map((text, index) =>
+          fetch('/api/mood-words', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ text, order: index }),
+          })
+        )
+      )
+
+      setWords([...current])
+      setSelectedWords((prev) => prev.filter((w) => current.includes(w)))
+      setManageOpen(false)
+      toast.success('Sentimentos salvos!')
+    } catch (err) {
+      console.error('❌ [client] Erro ao salvar sentimentos:', err)
+      toast.error('Erro ao salvar sentimentos')
     }
   }
 
-  fetchWords()
-}, [])
+  // ──────────────────────────────────────────────────────────────
+  // ATIVIDADES
+  // ──────────────────────────────────────────────────────────────
+  const handleAddAtividade = () => {
+    setManagedActivities([...categories])
+    setNewActivityName("")
+    setNewActivityIcon("")
+    setManageActivitiesOpen(true)
+  }
+
+  const handleEditAtividades = () => {
+    setManagedActivities([...categories])
+    setManageActivitiesOpen(true)
+  }
+
+  const handleReorderAtividades = () => {
+    setManagedActivities([...categories])
+    setManageActivitiesOpen(true)
+  }
+
+  const handleManagedActivityChange = (index: number, field: 'name' | 'icon', value: string) => {
+    setManagedActivities(prev => {
+      const copy = [...prev]
+      copy[index] = { ...copy[index], [field]: value }
+      return copy
+    })
+  }
+
+  const handleManagedActivityRemove = async (index: number) => {
+    const activity = managedActivities[index]
+    
+    // Só permite deletar atividades customizadas
+    if (!activity.isCustom) {
+      toast.error('Não é possível excluir atividades pré-definidas')
+      return
+    }
+
+    setManagedActivities(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const moveManagedActivity = (index: number, direction: "up" | "down") => {
+    setManagedActivities(prev => {
+      const copy = [...prev]
+      const newIndex = direction === "up" ? index - 1 : index + 1
+      if (newIndex < 0 || newIndex >= copy.length) return prev
+      const temp = copy[index]
+      copy[index] = copy[newIndex]
+      copy[newIndex] = temp
+      return copy
+    })
+  }
+
+  const handleAddNewManagedActivity = () => {
+    const name = newActivityName.trim()
+    const icon = newActivityIcon.trim() || '📝'
+    
+    if (!name) return
+
+    const newActivity: ActivityItem = {
+      id: `temp-${Date.now()}`, // ID temporário, será substituído pelo backend
+      name,
+      icon,
+      type: 'custom',
+      isCustom: true,
+    }
+
+    setManagedActivities(prev => [...prev, newActivity])
+    setNewActivityName("")
+    setNewActivityIcon("")
+  }
+
+  const handleSaveManagedActivities = async () => {
+    try {
+      const { tokens } = await fetchAuthSession()
+      const idToken = tokens?.idToken?.toString()
+      if (!idToken) throw new Error('sem token')
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      }
+
+      const previous = categories
+      const current = managedActivities
+
+      // Atividades removidas (só customizadas)
+      const removed = previous.filter(
+        (p) => p.isCustom && !current.find((c) => c.id === p.id)
+      )
+
+      // Atividades novas (id começa com 'temp-')
+      const added = current.filter((c) => c.id.startsWith('temp-'))
+
+      // Atividades editadas (nome ou ícone mudou)
+      const edited = current.filter((c) => {
+        if (c.id.startsWith('temp-')) return false
+        const prev = previous.find((p) => p.id === c.id)
+        return prev && (prev.name !== c.name || prev.icon !== c.icon)
+      })
+
+      console.log('💾 [client] removed:', removed)
+      console.log('💾 [client] added:', added)
+      console.log('💾 [client] edited:', edited)
+
+      // DELETE
+      await Promise.all(
+        removed.map((act) =>
+          fetch('/api/activities', {
+            method: 'DELETE',
+            headers,
+            body: JSON.stringify({ id: act.id }),
+          })
+        )
+      )
+
+      // POST (criar novas)
+      const createdActivities = await Promise.all(
+        added.map(async (act) => {
+          const res = await fetch('/api/activities', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ name: act.name, icon: act.icon }),
+          })
+          const json = await res.json()
+          return json.activity // retorna { id, name, icon, type, isCustom }
+        })
+      )
+
+      // PUT (editar existentes)
+      await Promise.all(
+        edited.map((act) =>
+          fetch('/api/activities', {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ id: act.id, name: act.name, icon: act.icon }),
+          })
+        )
+      )
+
+      // Atualizar estado local
+      let updatedCategories = current.filter((c) => !c.id.startsWith('temp-'))
+      updatedCategories = [...updatedCategories, ...createdActivities]
+
+      setCategories(updatedCategories)
+      setSelectedActivities((prev) =>
+        prev.filter((id) => updatedCategories.find((c) => c.id === id))
+      )
+      setManageActivitiesOpen(false)
+      toast.success('Atividades salvas!')
+    } catch (err) {
+      console.error('❌ [client] Erro ao salvar atividades:', err)
+      toast.error('Erro ao salvar atividades')
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // FETCH INICIAL
+  // ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    async function fetchWords() {
+      try {
+        const { tokens } = await fetchAuthSession()
+        const idToken = tokens?.idToken?.toString()
+
+        const headers: HeadersInit = {}
+        if (idToken) {
+          headers['Authorization'] = `Bearer ${idToken}`
+        }
+        
+        const res = await fetch('/api/mood-words', { headers })
+        const data = await res.json()
+        
+        const resActivities = await fetch('/api/activities', { headers })
+        const dataActivities = await resActivities.json()
+        
+        if (dataActivities.success && Array.isArray(dataActivities.activities)) {
+          setCategories(dataActivities.activities)
+        }
+
+        if (data.success && data.words) {
+          setWords(data.words)
+        } else {
+          console.error('Erro ao carregar palavras:', data.error)
+        }
+      } catch (error) {
+        console.error('Erro ao buscar mood words:', error)
+      } finally {
+        setLoading(false)
+        setLoadingActivities(false)
+      }
+    }
+
+    fetchWords()
+  }, [])
 
   const handleEmojiToggle = (emoji: string) => {
     setSelectedEmojis(prev => 
@@ -400,10 +581,7 @@ useEffect(() => {
               {loading ? (
                 <div className="flex flex-wrap gap-2">
                   {Array.from({ length: 12 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-6 w-20 bg-muted animate-pulse rounded-full"
-                    />
+                    <Skeleton key={i} className="h-6 w-20 rounded-full" />
                   ))}
                 </div>
               ) : (
@@ -423,6 +601,7 @@ useEffect(() => {
             </CardContent>
           </Card>
 
+          {/* Modal Sentimentos */}
           <Dialog open={manageOpen} onOpenChange={setManageOpen}>
             <DialogContent className="max-w-lg">
               <DialogHeader>
@@ -430,7 +609,6 @@ useEffect(() => {
               </DialogHeader>
 
               <div className="space-y-4">
-                {/* Adicionar novo */}
                 <div className="flex gap-2">
                   <Input
                     placeholder="Novo sentimento"
@@ -448,7 +626,6 @@ useEffect(() => {
                   </Button>
                 </div>
 
-                {/* Lista editável / reordenável */}
                 {managedWords.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     Nenhum sentimento cadastrado ainda.
@@ -515,43 +692,185 @@ useEffect(() => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
           {/* Activities */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary" />
-                Atividades
+              <CardTitle className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-primary" />
+                  <span>Atividades</span>
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7 rounded-full p-0"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleAddAtividade}>
+                      Adicionar atividades
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleEditAtividades}>
+                      Editar atividades
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleReorderAtividades}>
+                      Reordenar atividades
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardTitle>
               <CardDescription>
                 Marque as atividades que você realizou hoje
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {data.categories.map((category) => (
-                  <div key={category.id} className="flex items-center space-x-3">
-                    <Checkbox
-                      id={category.id}
-                      checked={selectedActivities.includes(category.id)}
-                      onCheckedChange={() => handleActivityToggle(category.id)}
-                    />
-                    <Label 
-                      htmlFor={category.id}
-                      className="flex items-center gap-2 cursor-pointer flex-1"
-                    >
-                      <span className="text-lg">{category.icon}</span>
-                      <span>{category.name}</span>
-                      {category.isCustom && (
-                        <Badge variant="secondary" className="text-xs">
-                          personalizada
-                        </Badge>
-                      )}
-                    </Label>
-                  </div>
-                ))}
-              </div>
+              {loadingActivities ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-3">
+                      <Skeleton className="h-4 w-4 rounded" />
+                      <Skeleton className="h-4 flex-1" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {categories.map((category) => (
+                    <div key={category.id} className="flex items-center space-x-3">
+                      <Checkbox
+                        id={category.id}
+                        checked={selectedActivities.includes(category.id)}
+                        onCheckedChange={() => handleActivityToggle(category.id)}
+                      />
+                      <Label 
+                        htmlFor={category.id}
+                        className="flex items-center gap-2 cursor-pointer flex-1"
+                      >
+                        <span className="text-lg">{category.icon}</span>
+                        <span className="text-sm">{category.name}</span>
+                        
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Modal Atividades */}
+          <Dialog open={manageActivitiesOpen} onOpenChange={setManageActivitiesOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Gerenciar atividades</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Nome da atividade"
+                    value={newActivityName}
+                    onChange={(e) => setNewActivityName(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    placeholder="Ícone (emoji)"
+                    value={newActivityIcon}
+                    onChange={(e) => setNewActivityIcon(e.target.value)}
+                    className="w-24"
+                  />
+                  <Button type="button" onClick={handleAddNewManagedActivity}>
+                    Adicionar
+                  </Button>
+                </div>
+
+                {managedActivities.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhuma atividade cadastrada ainda.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                    {managedActivities.map((activity, index) => (
+                      <div
+                        key={activity.id + index}
+                        className="flex items-center gap-2"
+                      >
+                        <Input
+                          value={activity.icon}
+                          onChange={(e) =>
+                            handleManagedActivityChange(index, 'icon', e.target.value)
+                          }
+                          className="w-16 text-center"
+                          disabled={!activity.isCustom}
+                        />
+                        <Input
+                          value={activity.name}
+                          onChange={(e) =>
+                            handleManagedActivityChange(index, 'name', e.target.value)
+                          }
+                          className="flex-1"
+                          disabled={!activity.isCustom}
+                        />
+                        {activity.isCustom && (
+                          <Badge variant="secondary" className="text-xs">
+                            custom
+                          </Badge>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            onClick={() => moveManagedActivity(index, "up")}
+                            disabled={index === 0}
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            onClick={() => moveManagedActivity(index, "down")}
+                            disabled={index === managedActivities.length - 1}
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            onClick={() => handleManagedActivityRemove(index)}
+                            disabled={!activity.isCustom}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setManageActivitiesOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={handleSaveManagedActivities}>
+                  Salvar alterações
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Notes */}
           <Card>

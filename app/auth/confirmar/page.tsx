@@ -2,11 +2,12 @@
 
 export const dynamic = 'force-dynamic'
 
+import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState } from "react";
 import { confirmSignUp } from "aws-amplify/auth";
 
-export default function ConfirmPage() {
+// Componente interno que usa useSearchParams
+function ConfirmPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const email = searchParams.get("email") ?? "";
@@ -46,5 +47,14 @@ export default function ConfirmPage() {
         Confirmar
       </button>
     </div>
+  );
+}
+
+// Componente default que envolve em Suspense (recomendação do Next)
+export default function ConfirmPage() {
+  return (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <ConfirmPageInner />
+    </Suspense>
   );
 }

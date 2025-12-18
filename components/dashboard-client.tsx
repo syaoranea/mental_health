@@ -35,8 +35,18 @@ interface DashboardClientProps {
   data: DashboardData
 }
 
+interface DashboardData {
+  recentMoods: any[]
+  stats: {
+    totalMoods: number
+    avgMood: number
+    totalActivities: number
+    sharedWith: number
+  }
+}
+
 export default function DashboardClient({ data }: DashboardClientProps) {
-  const { recentMoods, stats } = data
+  const { recentMoods } = data
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('7d')
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -44,36 +54,66 @@ export default function DashboardClient({ data }: DashboardClientProps) {
   const searchParams = useSearchParams();
   const [sessionInfo, setSessionInfo] = useState<any>(null);
   const [errorInfo, setErrorInfo] = useState<any>(null);
+  const [stats, setStats] = useState(data.stats)
   
   useEffect(() => {
-    async function init() {
-      try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-       if (!idToken) {
-          router.replace('/auth/entrar');
-          return;
-        }
-
-        const res = await fetch('/api/user', {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${idToken}`,
-          },
-        });
-
-        const data = await res.json();
-        console.log('Resposta /api/user:', data);
-      } catch (error) {
-        console.error('Erro ao inicializar dashboard:', error);
-        /* router.replace('/auth/entrar'); */
-      } finally {
-        setLoading(false);
+  async function init() {
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      if (!idToken) {
+        router.replace('/auth/entrar');
+        return;
       }
-    }
 
-    init();
-  }, [searchParams]);
+      // 1) Buscar usuário
+      const userRes = await fetch('/api/user', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      const userData = await userRes.json();
+      console.log('Resposta /api/user:', userData);
+
+      if (userRes.ok && userData.success) {
+        setUser(userData.user);
+      }
+
+      // 2) Buscar estatísticas do mês atual
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = now.getMonth() + 1
+
+      const statsRes = await fetch(`/api/mood-stats?year=${year}&month=${month}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      })
+
+      const statsData = await statsRes.json()
+      console.log('Resposta /api/mood-stats:', statsData)
+
+      if (statsRes.ok && statsData.success) {
+        setStats((prev) => ({
+          ...prev,
+          totalMoods: statsData.stats.totalMoods,
+          totalActivities: statsData.stats.totalActivities,
+          avgMood: statsData.stats.avgMood,
+        }))
+      }
+    } catch (error) {
+      console.error('Erro ao inicializar dashboard:', error);
+      // router.replace('/auth/entrar');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  init();
+}, [searchParams, router])
 
     const loginGoogle = async () => {
       await signInWithRedirect({ provider: 'Google' });
@@ -98,7 +138,7 @@ export default function DashboardClient({ data }: DashboardClientProps) {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Bem-vindo de volta! 👋
+                {user?.name ? `Bem-vindo de volta, ${user.name}! 👋` : 'Bem-vindo de volta! 👋'}
               </h1>
               <p className="text-gray-600">
                 {hasRecordedToday 

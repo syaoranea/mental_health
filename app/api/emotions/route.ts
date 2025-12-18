@@ -20,49 +20,79 @@ function getUserId(req: NextRequest) {
   return (user as any)?.username ?? (user as any)?.sub ?? null
 }
 
-// ────────────────────────────────────── GET  → lista emoções (pré-definidas + do usuário)
+// ────────────────────────────────────── GET  → lista emoções do banco (apenas)
 export async function GET(req: NextRequest) {
   try {
     console.log('🔎 [emotions] GET chamado')
 
     const userId = getUserId(req)
+    console.log('🔎 [emotions] userId:', userId)
 
-    const result = await ddb.send(
-      new ScanCommand({
-        TableName: TABLE_NAME,
-      })
-    )
+    let items: any[] = []
 
-    const items = (result.Items || []) as any[]
-    console.log('🔎 [emotions] Total itens na tabela:', items.length)
+    if (userId) {
+      // Buscar SOMENTE emoções desse usuário
+      const result = await ddb.send(
+        new ScanCommand({
+          TableName: TABLE_NAME,
+          FilterExpression: '#uid = :uid',
+          ExpressionAttributeNames: {
+            '#uid': 'userId',
+          },
+          ExpressionAttributeValues: {
+            ':uid': userId,
+          },
+        })
+      )
 
-    // Emoções globais (userId = undefined ou 'global')
-    const globais = items.filter((it) => !it.userId || it.userId === 'global')
-    const personalizados =
-      userId != null ? items.filter((it) => it.userId === userId) : []
+      items = (result.Items || []) as any[]
+      console.log('🔎 [emotions] Itens para userId', userId, ':', items.length)
+    } else {
+      // Opcional: se quiser permitir ver todas quando não logado
+      const result = await ddb.send(
+        new ScanCommand({
+          TableName: TABLE_NAME,
+        })
+      )
+      items = (result.Items || []) as any[]
+      console.log('🔎 [emotions] Itens (sem userId):', items.length)
+    }
 
-    // Ordenar por order, depois por label
-    const ordered = [...globais, ...personalizados].sort((a, b) => {
+    // Ordenar por order, depois por text
+    const ordered = items.sort((a, b) => {
       const ao = a.order ?? 999999
       const bo = b.order ?? 999999
       if (ao !== bo) return ao - bo
-      return (a.label ?? '').localeCompare(b.label ?? '', 'pt-BR', {
+      return (a.text ?? '').localeCompare(b.text ?? '', 'pt-BR', {
         sensitivity: 'base',
       })
     })
 
-    const emotions = ordered.map((it) => ({
-      emotionId: it.emotionId as string,
-      id: (it.emotionId as string) ?? (it.id as string),
-      emoji: (it.emoji as string) ?? '😊',
-      label: it.label as string,
-      value: it.value as string,
-      order: it.order as number | undefined,
-      type: (it.type as 'predefined' | 'custom') ?? 'custom',
-      isCustom: it.isCustom ?? (it.userId && it.userId !== 'global'),
-    }))
+    const emotions = ordered.map((it) => {
+      const label = it.text ? String(it.text) : 'Sem nome'
+      const emoji = it.icon ? String(it.icon) : '😊'
 
-    console.log('🔎 [emotions] emotions retornadas:', emotions)
+      const value = label
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_')
+
+      return {
+        emotionId: it.descriptorId as string,
+        id: it.descriptorId as string,
+        emoji,
+        label,
+        value,
+        order: typeof it.order === 'number' ? it.order : undefined,
+        type: 'custom' as const,
+        isCustom: true,
+        userId: it.userId,
+      }
+    })
+
+    console.log('✅ [emotions] emotions retornadas:', emotions.length)
+    console.log('✅ [emotions] primeira emoção:', emotions[0])
 
     return Response.json({ success: true, emotions }, { status: 200 })
   } catch (error) {
@@ -91,47 +121,40 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     console.log('🔎 [emotions] POST body:', body)
 
-    const emoji = body.emoji?.trim() || '😊'
-    const label = body.label?.trim()
+    const icon = body.emoji?.trim() || '😊'  // front manda "emoji", salva como "icon"
+    const text = body.label?.trim()          // front manda "label", salva como "text"
     const order: number | null =
       typeof body.order === 'number' ? body.order : null
 
-    if (!label) {
+    if (!text) {
       return Response.json(
         { success: false, error: 'label obrigatório' },
         { status: 400 }
       )
     }
 
-    // Gerar value a partir do label (lowercase, sem acentos)
-    const value = label
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, '_')
-
-    // Verificar se já existe emoção com esse label para o usuário
+    // Verificar se já existe emoção com esse text para o usuário
     const scan = await ddb.send(
       new ScanCommand({
         TableName: TABLE_NAME,
-        FilterExpression: '#uid = :uid AND #lbl = :lbl',
+        FilterExpression: '#uid = :uid AND #txt = :txt',
         ExpressionAttributeNames: {
           '#uid': 'userId',
-          '#lbl': 'label',
+          '#txt': 'text',
         },
         ExpressionAttributeValues: {
           ':uid': userId,
-          ':lbl': label,
+          ':txt': text,
         },
       })
     )
 
     const existing = (scan.Items || [])[0] as any | undefined
-    if (existing && existing.emotionId) {
+    if (existing && existing.descriptorId) {
       // Já existe → Update
-      const exprNames: Record<string, string> = { '#e': 'emoji' }
-      const exprValues: Record<string, any> = { ':e': emoji }
-      let updateExpr = 'SET #e = :e'
+      const exprNames: Record<string, string> = { '#i': 'icon' }
+      const exprValues: Record<string, any> = { ':i': icon }
+      let updateExpr = 'SET #i = :i'
 
       if (order !== null) {
         exprNames['#o'] = 'order'
@@ -141,7 +164,7 @@ export async function POST(req: NextRequest) {
 
       console.log(
         '📝 [emotions] UpdateItem Key:',
-        { userId, emotionId: existing.emotionId },
+        { userId, descriptorId: existing.descriptorId },
         'UpdateExpression:',
         updateExpr,
         'Values:',
@@ -153,7 +176,7 @@ export async function POST(req: NextRequest) {
           TableName: TABLE_NAME,
           Key: {
             userId,
-            emotionId: existing.emotionId,
+            descriptorId: existing.descriptorId,
           },
           UpdateExpression: updateExpr,
           ExpressionAttributeNames: exprNames,
@@ -161,14 +184,21 @@ export async function POST(req: NextRequest) {
         })
       )
 
+      const value = text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_')
+
       return Response.json(
         {
           success: true,
           emotion: {
-            id: existing.emotionId,
-            emoji,
-            label,
-            value: existing.value,
+            id: existing.descriptorId,
+            emotionId: existing.descriptorId,
+            emoji: icon,
+            label: text,
+            value,
             order: order ?? existing.order,
             type: 'custom' as const,
             isCustom: true,
@@ -179,16 +209,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Não existe → criar novo
-    const emotionId = crypto.randomUUID()
+    const descriptorId = crypto.randomUUID()
 
     const item: any = {
       userId,
-      emotionId,
-      emoji,
-      label,
-      value,
-      type: 'custom',
-      isCustom: true,
+      descriptorId,
+      icon,
+      text,
     }
     if (order !== null) {
       item.order = order
@@ -203,14 +230,21 @@ export async function POST(req: NextRequest) {
       })
     )
 
+    const value = text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, '_')
+
     console.log('✅ [emotions] Emoção criada com sucesso')
     return Response.json(
       {
         success: true,
         emotion: {
-          id: emotionId,
-          emoji,
-          label,
+          id: descriptorId,
+          emotionId: descriptorId,
+          emoji: icon,
+          label: text,
           value,
           order,
           type: 'custom' as const,
@@ -245,13 +279,13 @@ export async function PUT(req: NextRequest) {
     const body = await req.json()
     console.log('🔎 [emotions] PUT body:', body)
 
-    const emotionId = body.id as string | undefined
-    const emoji = body.emoji?.trim()
-    const label = body.label?.trim()
+    const descriptorId = body.id as string | undefined
+    const icon = body.emoji?.trim()   // front manda "emoji"
+    const text = body.label?.trim()   // front manda "label"
     const order: number | null =
       typeof body.order === 'number' ? body.order : null
 
-    if (!emotionId) {
+    if (!descriptorId) {
       return Response.json(
         { success: false, error: 'id obrigatório' },
         { status: 400 }
@@ -263,28 +297,18 @@ export async function PUT(req: NextRequest) {
     let updateExpr = 'SET '
     let hasUpdate = false
 
-    if (emoji) {
-      exprNames['#e'] = 'emoji'
-      exprValues[':e'] = emoji
-      updateExpr += '#e = :e'
+    if (icon) {
+      exprNames['#i'] = 'icon'
+      exprValues[':i'] = icon
+      updateExpr += '#i = :i'
       hasUpdate = true
     }
 
-    if (label) {
+    if (text) {
       if (hasUpdate) updateExpr += ', '
-      exprNames['#l'] = 'label'
-      exprValues[':l'] = label
-      updateExpr += '#l = :l'
-      
-      // Atualizar value também
-      const value = label
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/\s+/g, '_')
-      exprNames['#v'] = 'value'
-      exprValues[':v'] = value
-      updateExpr += ', #v = :v'
+      exprNames['#t'] = 'text'
+      exprValues[':t'] = text
+      updateExpr += '#t = :t'
       hasUpdate = true
     }
 
@@ -305,7 +329,7 @@ export async function PUT(req: NextRequest) {
 
     console.log(
       '📝 [emotions] UpdateItem Key:',
-      { userId, emotionId },
+      { userId, descriptorId },
       'UpdateExpression:',
       updateExpr,
       'Values:',
@@ -317,7 +341,7 @@ export async function PUT(req: NextRequest) {
         TableName: TABLE_NAME,
         Key: {
           userId,
-          emotionId,
+          descriptorId,
         },
         UpdateExpression: updateExpr,
         ExpressionAttributeNames: exprNames,
@@ -353,8 +377,8 @@ export async function DELETE(req: NextRequest) {
     const body = await req.json()
     console.log('🔎 [emotions] DELETE body:', body)
 
-    const emotionId = body.id as string | undefined
-    if (!emotionId) {
+    const descriptorId = body.id as string | undefined
+    if (!descriptorId) {
       return Response.json(
         { success: false, error: 'id obrigatório' },
         { status: 400 }
@@ -363,7 +387,7 @@ export async function DELETE(req: NextRequest) {
 
     console.log('🗑️ [emotions] DeleteItem Key:', {
       userId,
-      emotionId,
+      descriptorId,
     })
 
     await ddb.send(
@@ -371,7 +395,7 @@ export async function DELETE(req: NextRequest) {
         TableName: TABLE_NAME,
         Key: {
           userId,
-          emotionId,
+          descriptorId,
         },
       })
     )

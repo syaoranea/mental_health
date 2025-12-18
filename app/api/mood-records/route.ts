@@ -1,179 +1,131 @@
+// app/api/mood-records/route.ts
+import { NextRequest } from 'next/server'
+import { PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { ddb } from '@/lib/dynamodb'
+import { parseCognitoIdToken } from '@/lib/cognito-token'
+import { randomBytes } from 'crypto'
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-/* import { authOptions } from '@/lib/auth-options'
- */
+const TABLE_NAME = 'registroHumor'
 
-export const dynamic = 'force-dynamic'
+function getUserId(req: NextRequest) {
+  const auth = req.headers.get('authorization')
+  if (!auth?.startsWith('Bearer ')) return null
+  const idToken = auth.slice('Bearer '.length).trim()
+  const user = parseCognitoIdToken(idToken)
+  return (user as any)?.username ?? (user as any)?.sub ?? null
+}
 
-/* export async function POST(request: NextRequest) {
+// POST: criar novo registro
+export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
+    const userId = getUserId(req)
+    if (!userId) {
+      return Response.json(
+        { success: false, error: 'Não autenticado' },
         { status: 401 }
       )
     }
 
-    const { 
-      numericScale, 
-      emojis, 
-      descriptiveWords, 
-      notes, 
-      isPrivate, 
-      activities 
-    } = await request.json()
+    const body = await req.json()
+    console.log('📥 [mood-records] POST body:', body)
 
-    // Check if user already has a record for today
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    const registroId = randomBytes(16).toString('hex')
+    const now = new Date().toISOString()
 
-    const existingRecord = await prisma.moodRecord.findFirst({
-      where: {
-        userId: session.user.id,
-        date: {
-          gte: today,
-          lt: tomorrow
-        }
-      }
-    })
-
-    if (existingRecord) {
-      return NextResponse.json(
-        { error: 'Você já tem um registro para hoje. Use a opção de editar.' },
-        { status: 400 }
-      )
-    }
-
-    // Create mood record
-    const moodRecord = await prisma.moodRecord.create({
-      data: {
-        userId: session.user.id,
-        date: new Date(),
-        numericScale,
-        emojis,
-        descriptiveWords,
-        notes,
-        isPrivate,
-        photos: []
-      }
-    })
-
-    // Create activity records
-    if (activities?.length > 0) {
-      await prisma.activity.createMany({
-        data: activities.map((categoryId: string) => ({
-          moodRecordId: moodRecord.id,
-          categoryId,
-          completed: true
-        }))
+    await ddb.send(
+      new PutCommand({
+        TableName: TABLE_NAME,
+        Item: {
+          userId,
+          registroId,
+          createdAt: now,
+          timestamp: body.timestamp || now,
+          sentimentos: body.sentimentos ?? [],           // array de objetos
+          activities: body.activities ?? [],             // array de strings
+          descriptiveWords: body.descriptiveWords ?? [], // array de strings
+          notes: body.notes ?? '',
+          numericScale: body.numericScale ?? null,       // 👈 número 1–10
+        },
       })
-    }
+    )
 
-    return NextResponse.json(
-      { 
-        message: 'Registro criado com sucesso',
-        id: moodRecord.id
-      },
+    console.log('✅ [mood-records] Registro criado:', registroId)
+
+    return Response.json(
+      { success: true, registroId },
       { status: 201 }
     )
-
   } catch (error) {
-    console.error('Mood record creation error:', error)
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+    console.error('❌ [mood-records] Erro POST:', error)
+    return Response.json(
+      { success: false, error: 'Erro ao criar registro' },
       { status: 500 }
     )
   }
 }
 
-export async function PUT(request: NextRequest) {
+// PUT: atualizar registro existente
+export async function PUT(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
+    const userId = getUserId(req)
+    if (!userId) {
+      return Response.json(
+        { success: false, error: 'Não autenticado' },
         { status: 401 }
       )
     }
 
-    const { 
-      existingId,
-      numericScale, 
-      emojis, 
-      descriptiveWords, 
-      notes, 
-      isPrivate, 
-      activities 
-    } = await request.json()
+    const body = await req.json()
+    console.log('📥 [mood-records] PUT body:', body)
 
-    if (!existingId) {
-      return NextResponse.json(
-        { error: 'ID do registro é obrigatório' },
+    if (!body.registroId) {
+      return Response.json(
+        { success: false, error: 'registroId obrigatório' },
         { status: 400 }
       )
     }
 
-    // Verify ownership
-    const existingRecord = await prisma.moodRecord.findFirst({
-      where: {
-        id: existingId,
-        userId: session.user.id
-      }
-    })
-
-    if (!existingRecord) {
-      return NextResponse.json(
-        { error: 'Registro não encontrado' },
-        { status: 404 }
-      )
-    }
-
-    // Update mood record
-    const updatedRecord = await prisma.moodRecord.update({
-      where: { id: existingId },
-      data: {
-        numericScale,
-        emojis,
-        descriptiveWords,
-        notes,
-        isPrivate
-      }
-    })
-
-    // Delete existing activities and create new ones
-    await prisma.activity.deleteMany({
-      where: { moodRecordId: existingId }
-    })
-
-    if (activities?.length > 0) {
-      await prisma.activity.createMany({
-        data: activities.map((categoryId: string) => ({
-          moodRecordId: existingId,
-          categoryId,
-          completed: true
-        }))
+    await ddb.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: {
+          userId,
+          registroId: body.registroId,
+        },
+        UpdateExpression: `
+          SET 
+            sentimentos = :sentimentos,
+            activities = :activities,
+            descriptiveWords = :descriptiveWords,
+            notes = :notes,
+            numericScale = :numericScale,
+            #ts = :timestamp
+        `,
+        ExpressionAttributeNames: {
+          '#ts': 'timestamp',
+        },
+        ExpressionAttributeValues: {
+          ':sentimentos': body.sentimentos ?? [],
+          ':activities': body.activities ?? [],
+          ':descriptiveWords': body.descriptiveWords ?? [],
+          ':notes': body.notes ?? '',
+          ':numericScale': body.numericScale ?? null,
+          ':timestamp': body.timestamp || new Date().toISOString(),
+        },
       })
-    }
-
-    return NextResponse.json(
-      { 
-        message: 'Registro atualizado com sucesso',
-        id: updatedRecord.id
-      }
     )
 
+    console.log('✅ [mood-records] Registro atualizado:', body.registroId)
+
+    return Response.json(
+      { success: true, registroId: body.registroId },
+      { status: 200 }
+    )
   } catch (error) {
-    console.error('Mood record update error:', error)
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+    console.error('❌ [mood-records] Erro PUT:', error)
+    return Response.json(
+      { success: false, error: 'Erro ao atualizar registro' },
       { status: 500 }
     )
   }
 }
- */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { signOut } from "aws-amplify/auth";
+import { signOut, fetchAuthSession, fetchUserAttributes } from "aws-amplify/auth";
 import { Heart, Menu, X, Plus, BarChart3, Users, Settings, LogOut, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -29,9 +29,45 @@ export function Header() {
   }, []);
 
   // Carrega usuário do Amplify
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const session = await fetchAuthSession();
+        if (session.tokens?.idToken) {
+          const attributes = await fetchUserAttributes();
+          setUser({
+            username: attributes.email || attributes.preferred_username || 'Usuário',
+            email: attributes.email,
+          });
+        }
+      } catch (error) {
+        console.log('Usuário não autenticado no Header');
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    }
 
+    if (mounted) {
+      loadUser();
+    }
+  }, [mounted]);
 
-  if (!mounted || loading) return null; // evita erro de hydration
+  if (!mounted || loading) {
+    // Renderiza um header vazio enquanto carrega
+    return (
+      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-3">
+              <Heart className="w-8 h-8 text-primary" />
+              <span className="text-xl font-bold text-gray-900">MeuRefúgio</span>
+            </div>
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   const handleSignOut = async () => {
     try {
@@ -55,12 +91,6 @@ export function Header() {
       label: 'Relatórios',
       href: '/relatorios',
       description: 'Visualizar dados'
-    },
-    {
-      icon: Users,
-      label: 'Compartilhar',
-      href: '/compartilhar',
-      description: 'Gerenciar acesso'
     },
     {
       icon: Settings,
@@ -128,6 +158,11 @@ export function Header() {
                   <p className="text-sm font-medium leading-none">
                     {user?.username ?? "Usuário"}
                   </p>
+                  {user?.email && (
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user.email}
+                    </p>
+                  )}
                 </div>
 
                 <DropdownMenuSeparator />
@@ -193,6 +228,23 @@ export function Header() {
                   </Button>
                 </Link>
               ))}
+
+              {/* Emergency Mobile */}
+              <Link 
+                href="/emergencia"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start gap-3 h-auto py-3 text-red-500 hover:bg-red-50 hover:text-red-600"
+                >
+                  <AlertCircle className="w-5 h-5" />
+                  <div className="text-left">
+                    <div className="font-medium">Emergência</div>
+                    <div className="text-xs text-gray-500">Ajuda imediata</div>
+                  </div>
+                </Button>
+              </Link>
             </div>
           </div>
         )}

@@ -1,8 +1,7 @@
-
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Heart, Plus, TrendingUp, Activity, Users, Calendar, AlertCircle } from 'lucide-react'
+import { Heart, Plus, TrendingUp, Activity, Calendar, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -18,8 +17,7 @@ import { QuickActions } from '@/components/quick-actions'
 import { formatDate, getMoodColorClass } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { fetchAuthSession, signInWithRedirect } from 'aws-amplify/auth'
-
+import { fetchAuthSession } from 'aws-amplify/auth'
 
 interface DashboardData {
   recentMoods: any[]
@@ -35,89 +33,98 @@ interface DashboardClientProps {
   data: DashboardData
 }
 
-interface DashboardData {
-  recentMoods: any[]
-  stats: {
-    totalMoods: number
-    avgMood: number
-    totalActivities: number
-    sharedWith: number
-  }
-}
-
 export default function DashboardClient({ data }: DashboardClientProps) {
-  const { recentMoods } = data
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('7d')
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  const searchParams = useSearchParams();
-  const [sessionInfo, setSessionInfo] = useState<any>(null);
-  const [errorInfo, setErrorInfo] = useState<any>(null);
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+  const searchParams = useSearchParams()
   const [stats, setStats] = useState(data.stats)
+  const [recentMoods, setRecentMoods] = useState(data.recentMoods)
   
   useEffect(() => {
-  async function init() {
-    try {
-      const session = await fetchAuthSession();
-      const idToken = session.tokens?.idToken?.toString();
-      if (!idToken) {
-        router.replace('/auth/entrar');
-        return;
+    async function init() {
+      try {
+        const session = await fetchAuthSession()
+        const idToken = session.tokens?.idToken?.toString()
+        if (!idToken) {
+          router.replace('/auth/entrar')
+          return
+        }
+
+        // 1) Buscar usuário
+        const userRes = await fetch('/api/user', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        })
+
+        const userData = await userRes.json()
+        console.log('Resposta /api/user:', userData)
+
+        if (userRes.ok && userData.success) {
+          setUser(userData.user)
+        }
+
+        // 2) Buscar estatísticas do mês atual
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = now.getMonth() + 1
+
+        const statsRes = await fetch(`/api/mood-stats?year=${year}&month=${month}`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        })
+
+        const statsData = await statsRes.json()
+        console.log('Resposta /api/mood-stats:', statsData)
+
+        if (statsRes.ok && statsData.success) {
+          setStats((prev) => ({
+            ...prev,
+            totalMoods: statsData.stats.totalMoods,
+            totalActivities: statsData.stats.totalActivities,
+            avgMood: statsData.stats.avgMood,
+          }))
+        }
+
+        // 3) Buscar registros recentes
+        const recordsRes = await fetch('/api/mood-records?limit=10', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        })
+
+        const recordsData = await recordsRes.json()
+        console.log('Resposta /api/mood-records:', recordsData)
+
+        if (recordsRes.ok && recordsData.success) {
+          // Transformar os dados do DynamoDB para o formato esperado pelo componente
+          const formattedMoods = recordsData.records.map((record: any) => ({
+            id: record.registroId,
+            date: record.timestamp,
+            numericScale: Array.isArray(record.numericScale) ? record.numericScale[0] : record.numericScale,
+            emojis: record.sentimentos?.map((s: any) => s.emoji) || [],
+            descriptiveWords: record.descriptiveWords || [],
+            activities: record.activities || [],
+            notes: record.notes || '',
+          }))
+
+          setRecentMoods(formattedMoods)
+        }
+      } catch (error) {
+        console.error('Erro ao inicializar dashboard:', error)
+      } finally {
+        setLoading(false)
       }
-
-      // 1) Buscar usuário
-      const userRes = await fetch('/api/user', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-        },
-      });
-
-      const userData = await userRes.json();
-      console.log('Resposta /api/user:', userData);
-
-      if (userRes.ok && userData.success) {
-        setUser(userData.user);
-      }
-
-      // 2) Buscar estatísticas do mês atual
-      const now = new Date()
-      const year = now.getFullYear()
-      const month = now.getMonth() + 1
-
-      const statsRes = await fetch(`/api/mood-stats?year=${year}&month=${month}`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-        },
-      })
-
-      const statsData = await statsRes.json()
-      console.log('Resposta /api/mood-stats:', statsData)
-
-      if (statsRes.ok && statsData.success) {
-        setStats((prev) => ({
-          ...prev,
-          totalMoods: statsData.stats.totalMoods,
-          totalActivities: statsData.stats.totalActivities,
-          avgMood: statsData.stats.avgMood,
-        }))
-      }
-    } catch (error) {
-      console.error('Erro ao inicializar dashboard:', error);
-      // router.replace('/auth/entrar');
-    } finally {
-      setLoading(false);
     }
-  }
 
-  init();
-}, [searchParams, router])
-
-    const loginGoogle = async () => {
-      await signInWithRedirect({ provider: 'Google' });
-    };
+    init()
+  }, [searchParams, router])
 
   const todayMood = recentMoods.find(mood => {
     const moodDate = new Date(mood.date).toDateString()
@@ -127,7 +134,8 @@ export default function DashboardClient({ data }: DashboardClientProps) {
 
   const hasRecordedToday = !!todayMood
 
-   if (loading) return <div>Carregando...</div>;
+  if (loading) return <div>Carregando...</div>
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       <Header />
@@ -159,8 +167,8 @@ export default function DashboardClient({ data }: DashboardClientProps) {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Stats Cards - Agora com 3 cards em vez de 4 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
@@ -205,21 +213,6 @@ export default function DashboardClient({ data }: DashboardClientProps) {
               <div className="text-2xl font-bold text-gray-900">{stats.totalActivities}</div>
               <p className="text-xs text-gray-500 mt-1">
                 registradas
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                Compartilhado
-              </CardTitle>
-              <Users className="w-4 h-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{stats.sharedWith}</div>
-              <p className="text-xs text-gray-500 mt-1">
-                pessoa{stats.sharedWith !== 1 ? 's' : ''}
               </p>
             </CardContent>
           </Card>
@@ -328,11 +321,7 @@ export default function DashboardClient({ data }: DashboardClientProps) {
                       <div className="space-y-2">
                         {todayMood.activities.map((activity: any, index: number) => (
                           <div key={index} className="flex items-center gap-2 text-sm">
-                            <span>{activity.category?.icon}</span>
-                            <span>{activity.category?.name}</span>
-                            {activity.completed && (
-                              <span className="text-green-600 text-xs">✓</span>
-                            )}
+                            <span className="text-xs">{activity}</span>
                           </div>
                         ))}
                       </div>

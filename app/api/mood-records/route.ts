@@ -1,6 +1,6 @@
 // app/api/mood-records/route.ts
 import { NextRequest } from 'next/server'
-import { PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { ddb } from '@/lib/dynamodb'
 import { parseCognitoIdToken } from '@/lib/cognito-token'
 import { randomBytes } from 'crypto'
@@ -13,6 +13,50 @@ function getUserId(req: NextRequest) {
   const idToken = auth.slice('Bearer '.length).trim()
   const user = parseCognitoIdToken(idToken)
   return (user as any)?.username ?? (user as any)?.sub ?? null
+}
+
+// GET: listar registros do usuário
+export async function GET(req: NextRequest) {
+  try {
+    const userId = getUserId(req)
+    if (!userId) {
+      return Response.json(
+        { success: false, error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
+
+    const { searchParams } = new URL(req.url)
+    const limit = Number(searchParams.get('limit')) || 10
+
+    console.log('📥 [mood-records] GET - userId:', userId, 'limit:', limit)
+
+    const result = await ddb.send(
+      new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: 'userId = :uid',
+        ExpressionAttributeValues: {
+          ':uid': userId,
+        },
+        ScanIndexForward: false, // ordem decrescente (mais recentes primeiro)
+        Limit: limit,
+      })
+    )
+
+    const items = result.Items || []
+    console.log('✅ [mood-records] Registros encontrados:', items.length)
+
+    return Response.json(
+      { success: true, records: items },
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error('❌ [mood-records] Erro GET:', error)
+    return Response.json(
+      { success: false, error: 'Erro ao buscar registros' },
+      { status: 500 }
+    )
+  }
 }
 
 // POST: criar novo registro
@@ -40,11 +84,11 @@ export async function POST(req: NextRequest) {
           registroId,
           createdAt: now,
           timestamp: body.timestamp || now,
-          sentimentos: body.sentimentos ?? [],           // array de objetos
-          activities: body.activities ?? [],             // array de strings
-          descriptiveWords: body.descriptiveWords ?? [], // array de strings
+          sentimentos: body.sentimentos ?? [],
+          activities: body.activities ?? [],
+          descriptiveWords: body.descriptiveWords ?? [],
           notes: body.notes ?? '',
-          numericScale: body.numericScale ?? null,       // 👈 número 1–10
+          numericScale: body.numericScale ?? null,
         },
       })
     )

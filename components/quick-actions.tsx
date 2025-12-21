@@ -28,14 +28,14 @@ export function QuickActions({ hasRecordedToday }: QuickActionsProps) {
       primary: false,
       color: 'text-blue-600'
     },
-    {
+    /* {
       icon: Users,
       title: 'Compartilhar',
       description: 'Gerenciar acesso',
       href: '/compartilhar',
       primary: false,
       color: 'text-green-600'
-    },
+    }, */
     {
       icon: Settings,
       title: 'Configurações',
